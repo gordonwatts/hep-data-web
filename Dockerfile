@@ -1,7 +1,8 @@
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    DJANGO_SETTINGS_MODULE=hep_data_web.settings.prod
 
 WORKDIR /app
 
@@ -19,4 +20,3 @@ COPY . /app
 RUN uv sync --extra dev --frozen
 
 CMD ["uv", "run", "gunicorn", "hep_data_web.wsgi:application", "--bind", "0.0.0.0:8000"]
-
