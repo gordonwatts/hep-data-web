@@ -1,0 +1,137 @@
+"""Backend integration boundary for hep-data-llm."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import StrEnum
+from importlib import resources
+from typing import Any
+
+import yaml
+
+from hep_data_web.settings.base import env
+
+EXAMPLE_PACKAGE_CANDIDATES = (
+    "hep_data_llm",
+    "hep_data_llm.data",
+    "hep_data_llm.examples",
+)
+
+EXAMPLE_FILE_CANDIDATES = ("questions.yaml", "question.yaml")
+
+
+class BackendProfile(StrEnum):
+    SERVICEX_AWKWARD = "servicex_awkward"
+    RDF = "rdf"
+
+
+@dataclass(frozen=True)
+class BackendProfileChoice:
+    value: BackendProfile
+    label: str
+
+
+@dataclass(frozen=True)
+class ExampleQuestion:
+    prompt: str
+    dataset: str | None = None
+    title: str | None = None
+    source: str = "hep-data-llm"
+
+
+def available_profile_choices() -> list[BackendProfileChoice]:
+    return [
+        BackendProfileChoice(BackendProfile.SERVICEX_AWKWARD, "ServiceX + Awkward"),
+        BackendProfileChoice(BackendProfile.RDF, "RDF"),
+    ]
+
+
+def validate_backend_profile(value: str | BackendProfile) -> BackendProfile:
+    if isinstance(value, BackendProfile):
+        return value
+    try:
+        return BackendProfile(value)
+    except ValueError as exc:
+        valid = ", ".join(choice.value for choice in available_profile_choices())
+        raise ValueError(
+            f"Unsupported backend profile: {value!r}. Expected one of: {valid}"
+        ) from exc
+
+
+def _yaml_documents(package: str, filename: str) -> Any:
+    resource = resources.files(package).joinpath(filename)
+    if not resource.is_file():
+        raise FileNotFoundError(filename)
+    return yaml.safe_load(resource.read_text(encoding="utf-8"))
+
+
+def _normalize_question(raw: Any) -> ExampleQuestion | None:
+    if isinstance(raw, str):
+        prompt = raw.strip()
+        if prompt:
+            return ExampleQuestion(prompt=prompt)
+        return None
+
+    if isinstance(raw, dict):
+        prompt = (
+            raw.get("prompt") or raw.get("question") or raw.get("text") or raw.get("title") or ""
+        )
+        prompt = str(prompt).strip()
+        if not prompt:
+            return None
+        dataset = raw.get("dataset") or raw.get("data_set") or raw.get("rucio_dataset")
+        title = raw.get("title") or raw.get("name")
+        source = str(raw.get("source") or "hep-data-llm")
+        return ExampleQuestion(
+            prompt=prompt,
+            dataset=str(dataset).strip() if dataset else None,
+            title=str(title).strip() if title else None,
+            source=source,
+        )
+
+    return None
+
+
+def load_example_questions() -> list[ExampleQuestion]:
+    package_override = env("HEP_DATA_LLM_EXAMPLE_PACKAGE")
+    packages = (package_override,) if package_override else EXAMPLE_PACKAGE_CANDIDATES
+
+    for package in packages:
+        if not package:
+            continue
+        for filename in EXAMPLE_FILE_CANDIDATES:
+            try:
+                raw_questions = _yaml_documents(package, filename)
+            except (FileNotFoundError, ModuleNotFoundError, yaml.YAMLError):
+                continue
+
+            if not raw_questions:
+                continue
+
+            if isinstance(raw_questions, dict):
+                raw_questions = raw_questions.get("questions") or raw_questions.get("items") or []
+
+            if not isinstance(raw_questions, list):
+                raw_questions = [raw_questions]
+
+            questions = [
+                question
+                for raw in raw_questions
+                if (question := _normalize_question(raw)) is not None
+            ]
+            if questions:
+                return questions
+
+    return []
+
+
+def default_dataset() -> str | None:
+    explicit_dataset = env("HEP_DATA_LLM_DEFAULT_DATASET")
+    if explicit_dataset:
+        return explicit_dataset
+
+    for question in load_example_questions():
+        if question.dataset:
+            return question.dataset
+
+    return None

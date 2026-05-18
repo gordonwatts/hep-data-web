@@ -11,7 +11,9 @@ requires-python = ">=3.12"
 dependencies = [
   "Django>=5.1,<5.2",
   "gunicorn>=23.0,<24.0",
+  "hep-data-llm==1.1.1",
   "psycopg[binary]>=3.2,<4.0",
+  "PyYAML>=6.0,<7.0",
   "whitenoise>=6.7,<7.0",
 ]
 

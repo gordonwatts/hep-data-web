@@ -87,7 +87,7 @@ The work is intentionally split into small, checkable steps so it can be impleme
 - [x] Configure PostgreSQL from environment variables.
 - [x] Configure static files, media files, and persistent artifact storage paths.
 - [x] Configure development email backend to console output.
-- [ ] Configure production email backend through SMTP environment variables.
+- [x] Configure production email backend through SMTP environment variables.
 - [x] Add settings for GitHub OAuth credentials.
 - [x] Add settings for backend package version and runtime-related limits.
 
@@ -105,28 +105,28 @@ The work is intentionally split into small, checkable steps so it can be impleme
 
 ### 4. Backend integration scaffolding
 
-- [ ] Pin one explicit `hep-data-llm` version in dependencies.
-- [ ] Add a small integration-layer module that calls backend functionality from one place.
-- [ ] Add a helper to load example questions from the backend package.
-- [ ] Add a helper to obtain or define the default dataset from backend examples.
-- [ ] Add support for the backend profile choices exposed in V1:
-  - [ ] ServiceX + Awkward
-  - [ ] RDF
-- [ ] Add unit tests around the integration layer using mocks or fakes rather than running real analysis jobs.
+- [x] Pin one explicit `hep-data-llm` version in dependencies.
+- [x] Add a small integration-layer module that calls backend functionality from one place.
+- [x] Add a helper to load example questions from the backend package.
+- [x] Add a helper to obtain or define the default dataset from backend examples.
+- [x] Add support for the backend profile choices exposed in V1:
+  - [x] ServiceX + Awkward
+  - [x] RDF
+- [x] Add unit tests around the integration layer using mocks or fakes rather than running real analysis jobs.
 
 ### 5. Job and artifact persistence
 
-- [ ] Create the `Job` model.
-- [ ] Create the `JobArtifact` model.
-- [ ] Add migrations.
-- [ ] Add job creation logic that:
-  - [ ] records the user prompt
-  - [ ] injects the default dataset when none is supplied
-  - [ ] records the selected backend profile
-  - [ ] rejects submission when the global queue already has 20 active queued/running jobs
-- [ ] Add helper logic for queue depth and queue position.
-- [ ] Add artifact path conventions under a persistent media/artifact directory.
-- [ ] Add tests for job creation, default dataset injection, queue limit enforcement, and artifact metadata.
+- [x] Create the `Job` model.
+- [x] Create the `JobArtifact` model.
+- [x] Add migrations.
+- [x] Add job creation logic that:
+  - [x] records the user prompt
+  - [x] injects the default dataset when none is supplied
+  - [x] records the selected backend profile
+  - [x] rejects submission when the global queue already has 20 active queued/running jobs
+- [x] Add helper logic for queue depth and queue position.
+- [x] Add artifact path conventions under a persistent media/artifact directory.
+- [x] Add tests for job creation, default dataset injection, queue limit enforcement, and artifact metadata.
 
 ### 6. Worker and execution flow
 
@@ -239,12 +239,12 @@ The work is intentionally split into small, checkable steps so it can be impleme
 ### Unit tests
 
 - [ ] User approval state transitions
-- [ ] Queue limit logic
-- [ ] Queue position logic
-- [ ] Default dataset injection
-- [ ] Backend profile validation
+- [x] Queue limit logic
+- [x] Queue position logic
+- [x] Default dataset injection
+- [x] Backend profile validation
 - [ ] Worker state transitions
-- [ ] Artifact metadata handling
+- [x] Artifact metadata handling
 - [ ] Permission helpers
 
 ### Integration tests
