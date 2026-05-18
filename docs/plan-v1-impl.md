@@ -1,0 +1,276 @@
+# HEP Data LLM Web Frontend V1 Implementation Plan
+
+## Summary
+
+Build a small Django monolith that wraps the existing `hep-data-llm` workflow with:
+
+- GitHub OAuth login and manual user approval
+- A simple prompt-driven UI with backend profile selection
+- Persistent queued jobs executed asynchronously by one worker
+- Per-user history and result pages
+- Admin pages for approvals, queue inspection, cancellation, and deletion
+- Persistent PostgreSQL storage plus filesystem-backed artifacts
+- Docker-first local deployment
+
+The work is intentionally split into small, checkable steps so it can be implemented safely by a simpler model.
+
+## Chosen Defaults
+
+- **Framework:** Django monolith
+- **UI:** Django templates + light HTMX
+- **Visual system:** Bootstrap 5.3 with a custom “Quiet Scientific Portal” theme
+- **Database:** PostgreSQL
+- **Queue model:** Database-backed queue with one worker process
+- **Artifact storage:** Persistent filesystem volume
+- **Admin UX:** Custom lightweight admin pages
+- **Email:** Console backend in development, SMTP in production
+- **Deployment:** Docker Compose for app + PostgreSQL
+- **Backend integration:** Pin a specific `hep-data-llm` version; do not track backend HEAD automatically
+
+## Public Interfaces / Core Concepts
+
+### Main user-facing pages
+
+- `/` — prompt submission page, examples, and current user history
+- `/jobs/<id>/` — job result page
+- `/jobs/<id>/clone/` — clone/edit/resubmit flow
+- `/admin/users/` — pending user approvals
+- `/admin/jobs/` — global job and queue inspection
+
+### Core data models
+
+- `UserProfile`
+  - linked Django user
+  - approval status
+  - role (`user`, `admin`)
+- `Job`
+  - owner
+  - original prompt
+  - resolved dataset
+  - backend profile
+  - status (`queued`, `running`, `completed`, `failed`, `cancelled`)
+  - queue metadata
+  - timestamps
+  - runtime
+  - failure message
+  - artifact references
+- `JobArtifact`
+  - job
+  - artifact kind
+  - path
+  - whether it is the canonical downloadable artifact
+
+### Operational processes
+
+- Web app process
+- Worker process that:
+  - claims the next queued job
+  - runs exactly one job at a time
+  - updates job state
+  - stores artifacts
+  - sends terminal-state email
+
+## Implementation Checklist
+
+### 1. Project foundation
+
+- [ ] Create a new Django project and one primary application module.
+- [ ] Add dependency management with `pyproject.toml`.
+- [ ] Add local environment instructions using `uv`.
+- [ ] Add `.env.example` with all required environment variables.
+- [ ] Add baseline formatting, linting, and test configuration.
+- [ ] Add initial Dockerfile and `docker-compose.yml` for app + PostgreSQL.
+
+### 2. Configuration and environments
+
+- [ ] Split Django settings into development-friendly defaults driven by environment variables.
+- [ ] Configure PostgreSQL from environment variables.
+- [ ] Configure static files, media files, and persistent artifact storage paths.
+- [ ] Configure development email backend to console output.
+- [ ] Configure production email backend through SMTP environment variables.
+- [ ] Add settings for GitHub OAuth credentials.
+- [ ] Add settings for backend package version and runtime-related limits.
+
+### 3. Authentication and approval flow
+
+- [ ] Add GitHub OAuth authentication.
+- [ ] Create `UserProfile` with role and approval state.
+- [ ] On first login, create a pending profile instead of granting access.
+- [ ] Block pending and rejected users from normal app pages.
+- [ ] Send admin notification email when a new user becomes pending.
+- [ ] Build admin approval list page.
+- [ ] Add approve and reject actions.
+- [ ] Send user notification email after approval or rejection.
+- [ ] Add tests for login, pending state, approval, rejection, and permission boundaries.
+
+### 4. Backend integration scaffolding
+
+- [ ] Pin one explicit `hep-data-llm` version in dependencies.
+- [ ] Add a small integration-layer module that calls backend functionality from one place.
+- [ ] Add a helper to load example questions from the backend package.
+- [ ] Add a helper to obtain or define the default dataset from backend examples.
+- [ ] Add support for the backend profile choices exposed in V1:
+  - [ ] ServiceX + Awkward
+  - [ ] RDF
+- [ ] Add unit tests around the integration layer using mocks or fakes rather than running real analysis jobs.
+
+### 5. Job and artifact persistence
+
+- [ ] Create the `Job` model.
+- [ ] Create the `JobArtifact` model.
+- [ ] Add migrations.
+- [ ] Add job creation logic that:
+  - [ ] records the user prompt
+  - [ ] injects the default dataset when none is supplied
+  - [ ] records the selected backend profile
+  - [ ] rejects submission when the global queue already has 20 active queued/running jobs
+- [ ] Add helper logic for queue depth and queue position.
+- [ ] Add artifact path conventions under a persistent media/artifact directory.
+- [ ] Add tests for job creation, default dataset injection, queue limit enforcement, and artifact metadata.
+
+### 6. Worker and execution flow
+
+- [ ] Add a worker command/process separate from HTTP request handling.
+- [ ] Implement atomic claiming of the next queued job.
+- [ ] Ensure only one job is processed at a time.
+- [ ] Transition job states through queued → running → completed/failed.
+- [ ] Capture runtime, completion timestamp, failure message, generated code, and artifact references.
+- [ ] Preserve backend container-per-job execution behavior where feasible.
+- [ ] Add cancellation handling before execution begins and during safe checkpoints.
+- [ ] Send completion/failure emails only at terminal states.
+- [ ] Add tests for:
+  - [ ] queued job claim order
+  - [ ] successful completion
+  - [ ] failed execution
+  - [ ] cancellation
+  - [ ] email trigger behavior
+  - [ ] worker restart behavior with persisted state
+
+### 7. User-facing UI
+
+- [ ] Establish the shared visual theme before building individual pages:
+  - [ ] Use Bootstrap 5.3 as the base component framework.
+  - [ ] Define a small custom theme with navy primary color, warm neutral page background, white content surfaces, slate text, pale borders, and one restrained accent color.
+  - [ ] Prefer Bootstrap components over one-off custom CSS.
+  - [ ] Keep layouts spacious, readable, and beginner-friendly rather than dashboard-dense.
+- [ ] Build the main page with:
+  - [ ] prompt input
+  - [ ] backend profile dropdown
+  - [ ] clickable example prompts
+  - [ ] current user history table
+- [ ] Add queue-full messaging with friendly wording.
+- [ ] Add HTMX-driven partial refresh for queue position/status where useful.
+- [ ] Build the result page with:
+  - [ ] inline plot preview(s)
+  - [ ] inline generated code with syntax highlighting
+  - [ ] metadata
+  - [ ] error state
+  - [ ] download links
+- [ ] Add clone/edit/resubmit flow instead of exact rerun.
+- [ ] Ensure users only see their own jobs and artifacts.
+- [ ] Keep page structure consistent across the app:
+  - [ ] simple top navigation
+  - [ ] centered content area
+  - [ ] card-based major sections
+  - [ ] one clear primary action per page
+  - [ ] compact readable tables
+  - [ ] status shown with text plus badges, not color alone
+  - [ ] dark code-display panel for generated code
+- [ ] Add UI tests for submission, history visibility, result rendering, clone flow, and authorization.
+
+### 8. Admin UI
+
+- [ ] Build admin user approval page.
+- [ ] Build admin global job/queue page.
+- [ ] Add admin-only job inspection.
+- [ ] Add admin cancel action.
+- [ ] Add admin delete action.
+- [ ] Confirm destructive admin actions require explicit form submissions.
+- [ ] Add tests for admin permissions and admin-only actions.
+
+### 9. Docker and local operations
+
+- [ ] Complete Dockerfile for the Django app.
+- [ ] Add `docker-compose.yml` services for:
+  - [ ] web
+  - [ ] worker
+  - [ ] postgres
+- [ ] Add named volumes for:
+  - [ ] PostgreSQL data
+  - [ ] persisted artifacts
+- [ ] Add startup commands for migrations and static collection where needed.
+- [ ] Document local startup:
+  - [ ] create `.env`
+  - [ ] run `docker compose up`
+  - [ ] create admin user
+  - [ ] log in and approve users
+- [ ] Verify data survives container restart.
+- [ ] Verify artifacts survive container restart.
+
+### 10. Documentation and developer guidance
+
+- [ ] Keep `AGENTS.md` short and operational.
+- [ ] Add README or docs sections for:
+  - [ ] local setup
+  - [ ] environment variables
+  - [ ] test commands
+  - [ ] worker operation
+  - [ ] Docker Compose usage
+
+### 11. Final verification pass
+
+- [ ] Run formatting, linting, and tests.
+- [ ] Run migrations from a clean database.
+- [ ] Bring the stack up with Docker Compose.
+- [ ] Manually verify:
+  - [ ] first-login pending user flow
+  - [ ] admin approval flow
+  - [ ] prompt submission
+  - [ ] queue position updates
+  - [ ] result page rendering
+  - [ ] email delivery in development mode
+  - [ ] admin cancellation/deletion
+  - [ ] restart persistence for jobs and artifacts
+- [ ] Confirm no HTTP request path directly executes analysis work.
+- [ ] Confirm ordinary users cannot access other users’ jobs or artifacts.
+
+## Test Plan
+
+### Unit tests
+
+- [ ] User approval state transitions
+- [ ] Queue limit logic
+- [ ] Queue position logic
+- [ ] Default dataset injection
+- [ ] Backend profile validation
+- [ ] Worker state transitions
+- [ ] Artifact metadata handling
+- [ ] Permission helpers
+
+### Integration tests
+
+- [ ] OAuth callback flow with mocked provider
+- [ ] Job submission → worker processing → result availability
+- [ ] Failure path preserving generated code and error message
+- [ ] Email notifications for terminal states
+- [ ] User isolation
+- [ ] Admin approval/cancel/delete flows
+
+### Manual acceptance scenarios
+
+- [ ] New user logs in and is held for approval
+- [ ] Approved user submits prompt without dataset and gets default dataset behavior
+- [ ] Queue fills to limit and rejects the 21st active request
+- [ ] User disconnects and later returns to see completed history
+- [ ] Failed job remains visible with code and failure text
+- [ ] Admin can inspect all jobs but regular user cannot
+
+## Assumptions
+
+- V1 targets a single-node deployment and does not need distributed workers.
+- A single worker process is acceptable for the initial workload.
+- Filesystem-backed artifacts are sufficient for the expected storage size.
+- GitHub OAuth is acceptable even though future auth may move to CERN SSO or OIDC.
+- Example prompts and default dataset values should be reused from the backend package rather than duplicated manually when practical.
+- Exact reproducibility is out of scope; clone/edit/resubmit is the supported reuse behavior.
+- The V1 visual style should prioritize calm consistency and implementation simplicity over custom branding or a highly interactive frontend.
