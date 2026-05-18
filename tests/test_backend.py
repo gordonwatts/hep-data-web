@@ -23,7 +23,6 @@ def test_validate_backend_profile_rejects_unknown_value():
 def test_load_example_questions_reads_yaml_from_package(monkeypatch, tmp_path):
     package_dir = tmp_path / "hep_data_llm"
     package_dir.mkdir()
-    (package_dir / "__init__.py").write_text("")
     (package_dir / "questions.yaml").write_text(
         """
 questions:
@@ -34,8 +33,8 @@ questions:
 """
     )
 
-    monkeypatch.syspath_prepend(str(tmp_path))
     monkeypatch.setenv("HEP_DATA_LLM_EXAMPLE_PACKAGE", "hep_data_llm")
+    monkeypatch.setattr(backend.resources, "files", lambda package: package_dir)
 
     questions = backend.load_example_questions()
 

@@ -149,15 +149,15 @@ The work is intentionally split into small, checkable steps so it can be impleme
 ### 7. User-facing UI
 
 - [ ] Establish the shared visual theme before building individual pages:
-  - [ ] Use Bootstrap 5.3 as the base component framework.
-  - [ ] Define a small custom theme with navy primary color, warm neutral page background, white content surfaces, slate text, pale borders, and one restrained accent color.
-  - [ ] Prefer Bootstrap components over one-off custom CSS.
-  - [ ] Keep layouts spacious, readable, and beginner-friendly rather than dashboard-dense.
+  - [x] Use Bootstrap 5.3 as the base component framework.
+  - [x] Define a small custom theme with navy primary color, warm neutral page background, white content surfaces, slate text, pale borders, and one restrained accent color.
+  - [x] Prefer Bootstrap components over one-off custom CSS.
+  - [x] Keep layouts spacious, readable, and beginner-friendly rather than dashboard-dense.
 - [ ] Build the main page with:
-  - [ ] prompt input
-  - [ ] backend profile dropdown
-  - [ ] clickable example prompts
-  - [ ] current user history table
+  - [x] prompt input
+  - [x] backend profile dropdown
+  - [x] clickable example prompts
+  - [x] current user history table
 - [ ] Add queue-full messaging with friendly wording.
 - [ ] Add HTMX-driven partial refresh for queue position/status where useful.
 - [ ] Build the result page with:

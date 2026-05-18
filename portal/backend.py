@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import importlib
 from dataclasses import dataclass
 from enum import StrEnum
 from importlib import resources
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -59,10 +61,18 @@ def validate_backend_profile(value: str | BackendProfile) -> BackendProfile:
 
 
 def _yaml_documents(package: str, filename: str) -> Any:
-    resource = resources.files(package).joinpath(filename)
-    if not resource.is_file():
+    try:
+        resource = resources.files(package).joinpath(filename)
+        if resource.is_file():
+            return yaml.safe_load(resource.read_text(encoding="utf-8"))
+    except (ModuleNotFoundError, TypeError):
+        pass
+
+    module = importlib.import_module(package)
+    module_path = Path(module.__file__).resolve().parent / filename
+    if not module_path.is_file():
         raise FileNotFoundError(filename)
-    return yaml.safe_load(resource.read_text(encoding="utf-8"))
+    return yaml.safe_load(module_path.read_text(encoding="utf-8"))
 
 
 def _normalize_question(raw: Any) -> ExampleQuestion | None:

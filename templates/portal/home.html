@@ -4,21 +4,22 @@
 
 {% block content %}
   <div class="row g-4">
-    <div class="col-12">
+    <div class="col-lg-7">
       <div class="card shadow-sm">
         <div class="card-body p-4 p-md-5">
           <h1 class="h3 mb-3">Ask for a plot in plain language</h1>
-          <p class="mb-4">This is the foundation for the V1 portal. The next steps will wire in authentication, jobs, and backend execution.</p>
+          <p class="mb-4">Begin with a plain prompt. We’ll add queueing and execution next; for now, this page shows the structure the V1 portal will use.</p>
           <form class="row g-3">
             <div class="col-12">
               <label class="form-label" for="prompt">Prompt</label>
-              <textarea id="prompt" class="form-control" rows="4" placeholder="Example: make a plot of ..."></textarea>
+              <textarea id="prompt" name="prompt" class="form-control" rows="4" placeholder="Example: make a plot of ..."></textarea>
             </div>
             <div class="col-md-6">
               <label class="form-label" for="profile">Backend profile</label>
-              <select id="profile" class="form-select">
-                <option>ServiceX + Awkward</option>
-                <option>RDF</option>
+              <select id="profile" name="profile" class="form-select">
+                {% for choice in profile_choices %}
+                  <option value="{{ choice.value }}">{{ choice.label }}</option>
+                {% endfor %}
               </select>
             </div>
             <div class="col-12">
@@ -28,6 +29,70 @@
         </div>
       </div>
     </div>
-  </div>
-{% endblock %}
 
+    <div class="col-lg-5">
+      <div class="card shadow-sm mb-4">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h2 class="h5 mb-0">Example prompts</h2>
+            <span class="badge text-bg-light border">From hep-data-llm</span>
+          </div>
+          <div class="d-grid gap-2">
+            {% for example in example_questions %}
+              <button type="button" class="btn btn-outline-primary text-start example-prompt" data-example-prompt="{{ example.prompt|escape }}">
+                {{ example.title|default:example.prompt }}
+              </button>
+            {% empty %}
+              <div class="text-muted">No bundled examples were found.</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h2 class="h5 mb-0">Your history</h2>
+            <span class="badge text-bg-light border">{{ history_rows|length }} recent</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Prompt</th>
+                  <th>Profile</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in history_rows %}
+                  <tr>
+                    <td><span class="badge {{ row.badge_class }}">{{ row.status_label }}</span></td>
+                    <td class="small">{{ row.job.original_prompt }}</td>
+                    <td class="small">{{ row.job.get_backend_profile_display }}</td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="3" class="text-muted">No jobs yet.</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.querySelectorAll(".example-prompt").forEach((button) => {
+      button.addEventListener("click", () => {
+        const promptField = document.getElementById("prompt");
+        if (promptField) {
+          promptField.value = button.dataset.examplePrompt || "";
+          promptField.focus();
+        }
+      });
+    });
+  </script>
+{% endblock %}
