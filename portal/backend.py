@@ -20,6 +20,10 @@ EXAMPLE_PACKAGE_CANDIDATES = (
 )
 
 EXAMPLE_FILE_CANDIDATES = ("questions.yaml", "question.yaml")
+EXAMPLE_FILE_PATHS = (
+    ("config", "questions.yaml"),
+    ("config", "question.yaml"),
+)
 
 
 class BackendProfile(StrEnum):
@@ -113,7 +117,19 @@ def load_example_questions() -> list[ExampleQuestion]:
             try:
                 raw_questions = _yaml_documents(package, filename)
             except (FileNotFoundError, ModuleNotFoundError, yaml.YAMLError):
-                continue
+                raw_questions = None
+
+            if not raw_questions:
+                for path_parts in EXAMPLE_FILE_PATHS:
+                    try:
+                        resource = resources.files(package)
+                        for part in path_parts:
+                            resource = resource.joinpath(part)
+                        if resource.is_file():
+                            raw_questions = yaml.safe_load(resource.read_text(encoding="utf-8"))
+                            break
+                    except (ModuleNotFoundError, TypeError, yaml.YAMLError):
+                        continue
 
             if not raw_questions:
                 continue
