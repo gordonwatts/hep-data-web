@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+  <div class="row g-4">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-body p-4 p-md-5">
+          <h1 class="h3 mb-3">Ask for a plot in plain language</h1>
+          <p class="mb-4">This is the foundation for the V1 portal. The next steps will wire in authentication, jobs, and backend execution.</p>
+          <form class="row g-3">
+            <div class="col-12">
+              <label class="form-label" for="prompt">Prompt</label>
+              <textarea id="prompt" class="form-control" rows="4" placeholder="Example: make a plot of ..."></textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="profile">Backend profile</label>
+              <select id="profile" class="form-select">
+                <option>ServiceX + Awkward</option>
+                <option>RDF</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <button class="btn btn-primary">Submit</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

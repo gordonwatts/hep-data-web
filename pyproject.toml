@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hep-data-web"
+version = "0.1.0"
+description = "HEP Data LLM web frontend"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "Django>=5.1,<5.2",
+  "gunicorn>=23.0,<24.0",
+  "psycopg[binary]>=3.2,<4.0",
+  "whitenoise>=6.7,<7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9.0",
+  "pytest-django>=4.9,<5.0",
+  "ruff>=0.6,<0.7",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["hep_data_web*", "portal*"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "hep_data_web.settings"
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+

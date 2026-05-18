@@ -1,0 +1,31 @@
+services:
+  web:
+    build: .
+    command: uv run python manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: hep_data_web
+      POSTGRES_USER: hep_data_web
+      POSTGRES_PASSWORD: hep_data_web
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+  media_data:
+  static_data:
+
