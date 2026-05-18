@@ -74,22 +74,22 @@ The work is intentionally split into small, checkable steps so it can be impleme
 
 ### 1. Project foundation
 
-- [ ] Create a new Django project and one primary application module.
-- [ ] Add dependency management with `pyproject.toml`.
-- [ ] Add local environment instructions using `uv`.
-- [ ] Add `.env.example` with all required environment variables.
-- [ ] Add baseline formatting, linting, and test configuration.
-- [ ] Add initial Dockerfile and `docker-compose.yml` for app + PostgreSQL.
+- [x] Create a new Django project and one primary application module.
+- [x] Add dependency management with `pyproject.toml`.
+- [x] Add local environment instructions using `uv`.
+- [x] Add `.env.example` with all required environment variables.
+- [x] Add baseline formatting, linting, and test configuration.
+- [x] Add initial Dockerfile and `docker-compose.yml` for app + PostgreSQL.
 
 ### 2. Configuration and environments
 
-- [ ] Split Django settings into development-friendly defaults driven by environment variables.
-- [ ] Configure PostgreSQL from environment variables.
-- [ ] Configure static files, media files, and persistent artifact storage paths.
-- [ ] Configure development email backend to console output.
+- [x] Split Django settings into development-friendly defaults driven by environment variables.
+- [x] Configure PostgreSQL from environment variables.
+- [x] Configure static files, media files, and persistent artifact storage paths.
+- [x] Configure development email backend to console output.
 - [ ] Configure production email backend through SMTP environment variables.
-- [ ] Add settings for GitHub OAuth credentials.
-- [ ] Add settings for backend package version and runtime-related limits.
+- [x] Add settings for GitHub OAuth credentials.
+- [x] Add settings for backend package version and runtime-related limits.
 
 ### 3. Authentication and approval flow
 
