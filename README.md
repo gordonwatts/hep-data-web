@@ -50,6 +50,11 @@ docker compose exec web uv run python manage.py run_smoke_job
 If the backend image is not already available on your machine, set
 `HEP_DATA_LLM_DOCKER_IMAGE` in `.env` to the image tag you want the worker to use.
 
+When running the worker locally on your machine, it uses your normal home
+directory so `~/servicex.yaml` works as expected. The `HEP_DATA_LLM_HOME_DIR`
+override is only needed when you want to point the backend at a different home
+directory, such as the mounted path inside Docker Compose.
+
 ## Local Login
 
 The app uses Django's built-in login views for now. Create a user with:

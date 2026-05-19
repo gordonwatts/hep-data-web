@@ -114,9 +114,10 @@ def run_backend_job(job: Job) -> JobExecutionResult:
     output_path = output_dir / "result.md"
 
     env = os.environ.copy()
-    home_dir = str(getattr(settings, "HEP_DATA_LLM_HOME_DIR", settings.BASE_DIR))
-    env["HOME"] = home_dir
-    env["USERPROFILE"] = home_dir
+    home_dir = str(getattr(settings, "HEP_DATA_LLM_HOME_DIR", "")).strip()
+    if home_dir:
+        env["HOME"] = home_dir
+        env["USERPROFILE"] = home_dir
     env["XDG_CACHE_HOME"] = str(_backend_cache_root())
 
     proc = subprocess.run(

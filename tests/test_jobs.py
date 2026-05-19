@@ -1,3 +1,5 @@
+import os
+import subprocess
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -124,3 +126,49 @@ class ArtifactConventionTests(TestCase):
             )
         assert "--docker-image" in command
         assert "custom/image:tag" in command
+
+    def test_run_backend_job_keeps_current_home_when_no_override_is_configured(self):
+        user = get_user_model().objects.create_user(username="local-user")
+        job = Job.objects.create(
+            owner=user,
+            original_prompt="prompt",
+            resolved_dataset="dataset",
+            backend_profile="rdf",
+            status=JobStatus.RUNNING,
+        )
+        completed = subprocess.CompletedProcess(args=["dummy"], returncode=0, stdout="", stderr="")
+        with patch.dict(
+            os.environ,
+            {"HOME": "/real/home", "USERPROFILE": "C:\\Users\\real"},
+            clear=False,
+        ):
+            with patch.object(services.settings, "HEP_DATA_LLM_HOME_DIR", ""):
+                with patch("portal.services.subprocess.run", return_value=completed) as mock_run:
+                    services.run_backend_job(job)
+
+        env = mock_run.call_args.kwargs["env"]
+        assert env["HOME"] == "/real/home"
+        assert env["USERPROFILE"] == "C:\\Users\\real"
+
+    def test_run_backend_job_overrides_home_when_configured(self):
+        user = get_user_model().objects.create_user(username="docker-user-2")
+        job = Job.objects.create(
+            owner=user,
+            original_prompt="prompt",
+            resolved_dataset="dataset",
+            backend_profile="rdf",
+            status=JobStatus.RUNNING,
+        )
+        completed = subprocess.CompletedProcess(args=["dummy"], returncode=0, stdout="", stderr="")
+        with patch.dict(
+            os.environ,
+            {"HOME": "/real/home", "USERPROFILE": "C:\\Users\\real"},
+            clear=False,
+        ):
+            with patch.object(services.settings, "HEP_DATA_LLM_HOME_DIR", "/host-home"):
+                with patch("portal.services.subprocess.run", return_value=completed) as mock_run:
+                    services.run_backend_job(job)
+
+        env = mock_run.call_args.kwargs["env"]
+        assert env["HOME"] == "/host-home"
+        assert env["USERPROFILE"] == "/host-home"
