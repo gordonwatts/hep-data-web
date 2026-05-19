@@ -18,6 +18,34 @@ class HomePageUITests(TestCase):
         self.assertContains(response, "Example prompts")
         self.assertContains(response, "ETmiss")
 
+    def test_home_page_shows_only_three_random_examples(self):
+        with (
+            patch(
+                "portal.views.load_example_questions",
+                return_value=[
+                    ExampleQuestion(prompt="Prompt 1", title="One"),
+                    ExampleQuestion(prompt="Prompt 2", title="Two"),
+                    ExampleQuestion(prompt="Prompt 3", title="Three"),
+                    ExampleQuestion(prompt="Prompt 4", title="Four"),
+                ],
+            ),
+            patch(
+                "portal.views.sample",
+                return_value=[
+                    ExampleQuestion(prompt="Prompt 2", title="Two"),
+                    ExampleQuestion(prompt="Prompt 4", title="Four"),
+                    ExampleQuestion(prompt="Prompt 1", title="One"),
+                ],
+            ) as sample_mock,
+        ):
+            response = self.client.get("/")
+
+        sample_mock.assert_called_once()
+        self.assertContains(response, "One")
+        self.assertContains(response, "Two")
+        self.assertContains(response, "Four")
+        self.assertNotContains(response, "Three")
+
     def test_home_page_shows_logged_in_user_history(self):
         with patch("portal.views.load_example_questions", return_value=[]):
             user = get_user_model().objects.create_user(username="viewer")

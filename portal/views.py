@@ -1,8 +1,17 @@
+from random import sample
+
 from django.shortcuts import render
 from django.utils import timezone
 
 from portal.backend import available_profile_choices, load_example_questions
 from portal.models import Job
+
+
+def featured_example_questions():
+    example_questions = load_example_questions()
+    if len(example_questions) <= 3:
+        return example_questions
+    return sample(example_questions, 3)
 
 
 def home(request):
@@ -34,7 +43,7 @@ def home(request):
         "portal/home.html",
         {
             "page_title": "HEP Data LLM",
-            "example_questions": load_example_questions(),
+            "example_questions": featured_example_questions(),
             "profile_choices": available_profile_choices(),
             "history_rows": history_rows,
         },

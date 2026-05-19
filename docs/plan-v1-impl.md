@@ -157,6 +157,7 @@ The work is intentionally split into small, checkable steps so it can be impleme
   - [x] prompt input
   - [x] backend profile dropdown
   - [x] clickable example prompts
+  - [x] show three random example prompts per page load
   - [x] current user history table
 - [ ] Add queue-full messaging with friendly wording.
 - [ ] Add HTMX-driven partial refresh for queue position/status where useful.
