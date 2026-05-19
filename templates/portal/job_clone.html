@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Clone job {{ source_job.submission_id }}{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card shadow-sm">
+        <div class="card-body p-4 p-md-5">
+          <h1 class="h4 mb-3">Clone and edit</h1>
+          <p class="text-muted mb-4">Adjust the prompt, dataset, or profile, then resubmit as a new job.</p>
+
+          <form method="post" class="row g-3">
+            {% csrf_token %}
+            <div class="col-12">
+              <label class="form-label" for="prompt">Prompt</label>
+              <textarea id="prompt" name="prompt" class="form-control" rows="5">{{ prompt_value }}</textarea>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="dataset">Dataset override</label>
+              <input id="dataset" name="dataset" class="form-control" value="{{ dataset_value }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="profile">Backend profile</label>
+              <select id="profile" name="profile" class="form-select">
+                {% for choice in profile_choices %}
+                  <option value="{{ choice.value }}" {% if choice.value == selected_profile %}selected{% endif %}>{{ choice.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 d-flex gap-2">
+              <button class="btn btn-primary" type="submit">Resubmit</button>
+              <a class="btn btn-outline-secondary" href="{% url 'job-detail' submission_id=source_job.submission_id %}">Back to job</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

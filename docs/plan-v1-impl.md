@@ -130,54 +130,54 @@ The work is intentionally split into small, checkable steps so it can be impleme
 
 ### 6. Worker and execution flow
 
-- [ ] Add a worker command/process separate from HTTP request handling.
-- [ ] Implement atomic claiming of the next queued job.
-- [ ] Ensure only one job is processed at a time.
-- [ ] Transition job states through queued → running → completed/failed.
-- [ ] Capture runtime, completion timestamp, failure message, generated code, and artifact references.
-- [ ] Preserve backend container-per-job execution behavior where feasible.
+- [x] Add a worker command/process separate from HTTP request handling.
+- [x] Implement atomic claiming of the next queued job.
+- [x] Ensure only one job is processed at a time.
+- [x] Transition job states through queued → running → completed/failed.
+- [x] Capture runtime, completion timestamp, failure message, generated code, and artifact references.
+- [x] Preserve backend container-per-job execution behavior where feasible.
 - [ ] Add cancellation handling before execution begins and during safe checkpoints.
 - [ ] Send completion/failure emails only at terminal states.
 - [ ] Add tests for:
-  - [ ] queued job claim order
-  - [ ] successful completion
-  - [ ] failed execution
+  - [x] queued job claim order
+  - [x] successful completion
+  - [x] failed execution
   - [ ] cancellation
   - [ ] email trigger behavior
   - [ ] worker restart behavior with persisted state
 
 ### 7. User-facing UI
 
-- [ ] Establish the shared visual theme before building individual pages:
+- [x] Establish the shared visual theme before building individual pages:
   - [x] Use Bootstrap 5.3 as the base component framework.
   - [x] Define a small custom theme with navy primary color, warm neutral page background, white content surfaces, slate text, pale borders, and one restrained accent color.
   - [x] Prefer Bootstrap components over one-off custom CSS.
   - [x] Keep layouts spacious, readable, and beginner-friendly rather than dashboard-dense.
-- [ ] Build the main page with:
+- [x] Build the main page with:
   - [x] prompt input
   - [x] backend profile dropdown
   - [x] clickable example prompts
   - [x] show three random example prompts per page load
   - [x] current user history table
-- [ ] Add queue-full messaging with friendly wording.
+- [x] Add queue-full messaging with friendly wording.
 - [ ] Add HTMX-driven partial refresh for queue position/status where useful.
-- [ ] Build the result page with:
-  - [ ] inline plot preview(s)
-  - [ ] inline generated code with syntax highlighting
-  - [ ] metadata
-  - [ ] error state
-  - [ ] download links
-- [ ] Add clone/edit/resubmit flow instead of exact rerun.
-- [ ] Ensure users only see their own jobs and artifacts.
-- [ ] Keep page structure consistent across the app:
-  - [ ] simple top navigation
-  - [ ] centered content area
-  - [ ] card-based major sections
-  - [ ] one clear primary action per page
-  - [ ] compact readable tables
-  - [ ] status shown with text plus badges, not color alone
-  - [ ] dark code-display panel for generated code
-- [ ] Add UI tests for submission, history visibility, result rendering, clone flow, and authorization.
+- [x] Build the result page with:
+  - [x] inline plot preview(s)
+  - [x] inline generated code with syntax highlighting
+  - [x] metadata
+  - [x] error state
+  - [x] download links
+- [x] Add clone/edit/resubmit flow instead of exact rerun.
+- [x] Ensure users only see their own jobs and artifacts.
+- [x] Keep page structure consistent across the app:
+  - [x] simple top navigation
+  - [x] centered content area
+  - [x] card-based major sections
+  - [x] one clear primary action per page
+  - [x] compact readable tables
+  - [x] status shown with text plus badges, not color alone
+  - [x] dark code-display panel for generated code
+- [x] Add UI tests for submission, history visibility, result rendering, clone flow, and authorization.
 
 ### 8. Admin UI
 
@@ -215,7 +215,7 @@ The work is intentionally split into small, checkable steps so it can be impleme
   - [ ] local setup
   - [ ] environment variables
   - [ ] test commands
-  - [ ] worker operation
+  - [x] worker operation
   - [ ] Docker Compose usage
 
 ### 11. Final verification pass

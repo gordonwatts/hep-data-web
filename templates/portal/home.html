@@ -8,11 +8,21 @@
       <div class="card shadow-sm">
         <div class="card-body p-4 p-md-5">
           <h1 class="h3 mb-3">Ask for a plot in plain language</h1>
-          <p class="mb-4">Begin with a plain prompt. We’ll add queueing and execution next; for now, this page shows the structure the V1 portal will use.</p>
-          <form class="row g-3">
+          <p class="mb-4">Begin with a plain prompt. Your request will be queued and run asynchronously by the worker.</p>
+          {% if not user.is_authenticated %}
+            <div class="alert alert-info">
+              Log in to submit a request and see your private history.
+            </div>
+          {% endif %}
+          <form class="row g-3" method="post" action="{{ submit_url }}">
+            {% csrf_token %}
             <div class="col-12">
               <label class="form-label" for="prompt">Prompt</label>
               <textarea id="prompt" name="prompt" class="form-control" rows="4" placeholder="Example: make a plot of ..."></textarea>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="dataset">Dataset override</label>
+              <input id="dataset" name="dataset" class="form-control" placeholder="Optional dataset; leave blank to use the default ATLAS Open Data JZ sample">
             </div>
             <div class="col-md-6">
               <label class="form-label" for="profile">Backend profile</label>
@@ -23,7 +33,7 @@
               </select>
             </div>
             <div class="col-12">
-              <button class="btn btn-primary">Submit</button>
+              <button class="btn btn-primary" {% if not user.is_authenticated %}disabled{% endif %}>Submit</button>
             </div>
           </form>
         </div>
@@ -62,6 +72,8 @@
                   <th>Status</th>
                   <th>Prompt</th>
                   <th>Profile</th>
+                  <th>Queue</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -70,10 +82,22 @@
                     <td><span class="badge {{ row.badge_class }}">{{ row.status_label }}</span></td>
                     <td class="small">{{ row.job.original_prompt }}</td>
                     <td class="small">{{ row.job.get_backend_profile_display }}</td>
+                    <td class="small">
+                      {% if row.queue_position %}
+                        Queue {{ row.queue_position }}
+                      {% else %}
+                        -
+                      {% endif %}
+                    </td>
+                    <td class="small">
+                      <a href="{{ row.view_url }}">View</a>
+                      <span class="text-muted mx-1">|</span>
+                      <a href="{{ row.clone_url }}">Clone</a>
+                    </td>
                   </tr>
                 {% empty %}
                   <tr>
-                    <td colspan="3" class="text-muted">No jobs yet.</td>
+                    <td colspan="5" class="text-muted">No jobs yet.</td>
                   </tr>
                 {% endfor %}
               </tbody>

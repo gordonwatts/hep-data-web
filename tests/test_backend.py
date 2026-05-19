@@ -15,6 +15,13 @@ def test_validate_backend_profile_accepts_known_value():
     assert backend.validate_backend_profile("rdf") is backend.BackendProfile.RDF
 
 
+def test_backend_config_name_matches_v1_profile():
+    assert (
+        backend.backend_config_name_for_profile(backend.BackendProfile.SERVICEX_AWKWARD)
+        == "atlas-sx-awk-hist"
+    )
+
+
 def test_validate_backend_profile_rejects_unknown_value():
     with pytest.raises(ValueError, match="Unsupported backend profile"):
         backend.validate_backend_profile("unknown")
@@ -58,9 +65,23 @@ def test_default_dataset_falls_back_to_first_example_dataset(monkeypatch):
         backend,
         "load_example_questions",
         lambda: [
-            backend.ExampleQuestion(prompt="a"),
+            backend.ExampleQuestion(prompt="Plot ETmiss in the rucio dataset dataset-a."),
             backend.ExampleQuestion(prompt="b", dataset="derived-dataset"),
         ],
     )
 
-    assert backend.default_dataset() == "derived-dataset"
+    assert backend.default_dataset() == "dataset-a"
+
+
+def test_normalize_question_infers_dataset_from_prompt():
+    question = backend._normalize_question(
+        "Plot the ETmiss of all events in the rucio dataset user.example.dataset."
+    )
+    assert question is not None
+    assert question.dataset == "user.example.dataset"
+
+
+def test_render_job_prompt_injects_dataset_once():
+    prompt = backend.render_job_prompt("Plot ETmiss", "dataset")
+    assert prompt.endswith("Dataset to use: dataset")
+    assert backend.render_job_prompt(prompt, "dataset") == prompt

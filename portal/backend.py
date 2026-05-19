@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 from importlib import resources
@@ -52,6 +53,15 @@ def available_profile_choices() -> list[BackendProfileChoice]:
     ]
 
 
+def backend_config_name_for_profile(value: str | BackendProfile) -> str:
+    profile = validate_backend_profile(value)
+    if profile is BackendProfile.SERVICEX_AWKWARD:
+        return "atlas-sx-awk-hist"
+    if profile is BackendProfile.RDF:
+        return "atlas-sx-rdf"
+    raise ValueError(f"Unsupported backend profile: {value!r}")
+
+
 def validate_backend_profile(value: str | BackendProfile) -> BackendProfile:
     if isinstance(value, BackendProfile):
         return value
@@ -83,7 +93,7 @@ def _normalize_question(raw: Any) -> ExampleQuestion | None:
     if isinstance(raw, str):
         prompt = raw.strip()
         if prompt:
-            return ExampleQuestion(prompt=prompt)
+            return ExampleQuestion(prompt=prompt, dataset=_dataset_from_prompt(prompt))
         return None
 
     if isinstance(raw, dict):
@@ -94,6 +104,8 @@ def _normalize_question(raw: Any) -> ExampleQuestion | None:
         if not prompt:
             return None
         dataset = raw.get("dataset") or raw.get("data_set") or raw.get("rucio_dataset")
+        if not dataset:
+            dataset = _dataset_from_prompt(prompt)
         title = raw.get("title") or raw.get("name")
         source = str(raw.get("source") or "hep-data-llm")
         return ExampleQuestion(
@@ -104,6 +116,16 @@ def _normalize_question(raw: Any) -> ExampleQuestion | None:
         )
 
     return None
+
+
+def _dataset_from_prompt(prompt: str) -> str | None:
+    match = re.search(r"rucio dataset\s+(.+)$", prompt, re.IGNORECASE)
+    if not match:
+        return None
+
+    dataset = match.group(1).strip().rstrip(" .")
+    dataset = dataset.strip("\"'`")
+    return dataset or None
 
 
 def load_example_questions() -> list[ExampleQuestion]:
@@ -159,5 +181,16 @@ def default_dataset() -> str | None:
     for question in load_example_questions():
         if question.dataset:
             return question.dataset
+        inferred_dataset = _dataset_from_prompt(question.prompt)
+        if inferred_dataset:
+            return inferred_dataset
 
     return None
+
+
+def render_job_prompt(prompt: str, dataset: str | None) -> str:
+    if not dataset:
+        return prompt
+    if dataset in prompt:
+        return prompt
+    return f"{prompt}\n\nDataset to use: {dataset}"
