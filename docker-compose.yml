@@ -1,18 +1,78 @@
 services:
+  docker:
+    image: docker:29-dind
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    command: ["--host=tcp://0.0.0.0:2375"]
+    volumes:
+      - docker_data:/var/lib/docker
+      - analysis_tmp:/tmp
+
   web:
     build: .
     command: uv run python manage.py runserver 0.0.0.0:8000
     ports:
       - "8000:8000"
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       DJANGO_SETTINGS_MODULE: hep_data_web.settings.dev
+      DATABASE_URL: postgresql://hep_data_web:hep_data_web@postgres:5432/hep_data_web
+      DOCKER_HOST: tcp://docker:2375
+      HOME: /host-home
+      USERPROFILE: /host-home
+      TMPDIR: /tmp
+      HEP_DATA_LLM_HOME_DIR: /host-home
+      HEP_DATA_LLM_DOCKER_IMAGE: hepdatallm-awkward:latest
     volumes:
-      - .:/app
-      - media_data:/app/media
-      - static_data:/app/staticfiles
+      - type: bind
+        source: ${USERPROFILE}
+        target: /host-home
+      - type: volume
+        source: media_data
+        target: /app/media
+      - type: volume
+        source: static_data
+        target: /app/staticfiles
+      - type: volume
+        source: analysis_tmp
+        target: /tmp
     depends_on:
+      - docker
+      - postgres
+
+  worker:
+    build: .
+    command: uv run python manage.py run_worker
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DJANGO_SETTINGS_MODULE: hep_data_web.settings.dev
+      DATABASE_URL: postgresql://hep_data_web:hep_data_web@postgres:5432/hep_data_web
+      DOCKER_HOST: tcp://docker:2375
+      HOME: /host-home
+      USERPROFILE: /host-home
+      TMPDIR: /tmp
+      HEP_DATA_LLM_HOME_DIR: /host-home
+      HEP_DATA_LLM_DOCKER_IMAGE: hepdatallm-awkward:latest
+    volumes:
+      - type: bind
+        source: ${USERPROFILE}
+        target: /host-home
+      - type: volume
+        source: media_data
+        target: /app/media
+      - type: volume
+        source: static_data
+        target: /app/staticfiles
+      - type: volume
+        source: analysis_tmp
+        target: /tmp
+    depends_on:
+      - docker
       - postgres
 
   postgres:
@@ -27,6 +87,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
 volumes:
+  analysis_tmp:
+  docker_data:
   postgres_data:
   media_data:
   static_data:

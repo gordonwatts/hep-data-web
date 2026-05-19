@@ -1,9 +1,12 @@
 .git
 .venv
+.uv-cache
+.pytest-tmp
+.ruff_cache
 __pycache__
 .pytest_cache
 .ruff_cache
 db.sqlite3
 media
 staticfiles
-
+.agents

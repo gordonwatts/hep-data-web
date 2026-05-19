@@ -82,7 +82,7 @@ def _backend_cache_root() -> Path:
 
 def _backend_command_for_job(job: Job, output_path: Path) -> list[str]:
     prompt = render_job_prompt(job.original_prompt, job.resolved_dataset)
-    return [
+    command = [
         sys.executable,
         "-m",
         "hep_data_llm.cli",
@@ -92,6 +92,10 @@ def _backend_command_for_job(job: Job, output_path: Path) -> list[str]:
         "--profile",
         backend_config_name_for_profile(job.backend_profile),
     ]
+    docker_image = getattr(settings, "HEP_DATA_LLM_DOCKER_IMAGE", "")
+    if docker_image:
+        command.extend(["--docker-image", docker_image])
+    return command
 
 
 def _extract_generated_code(markdown_text: str) -> str:
@@ -110,8 +114,9 @@ def run_backend_job(job: Job) -> JobExecutionResult:
     output_path = output_dir / "result.md"
 
     env = os.environ.copy()
-    env["HOME"] = str(settings.BASE_DIR)
-    env["USERPROFILE"] = str(settings.BASE_DIR)
+    home_dir = str(getattr(settings, "HEP_DATA_LLM_HOME_DIR", settings.BASE_DIR))
+    env["HOME"] = home_dir
+    env["USERPROFILE"] = home_dir
     env["XDG_CACHE_HOME"] = str(_backend_cache_root())
 
     proc = subprocess.run(

@@ -191,14 +191,14 @@ The work is intentionally split into small, checkable steps so it can be impleme
 
 ### 9. Docker and local operations
 
-- [ ] Complete Dockerfile for the Django app.
-- [ ] Add `docker-compose.yml` services for:
-  - [ ] web
-  - [ ] worker
-  - [ ] postgres
-- [ ] Add named volumes for:
-  - [ ] PostgreSQL data
-  - [ ] persisted artifacts
+- [x] Complete Dockerfile for the Django app.
+- [x] Add `docker-compose.yml` services for:
+  - [x] web
+  - [x] worker
+  - [x] postgres
+- [x] Add named volumes for:
+  - [x] PostgreSQL data
+  - [x] persisted artifacts
 - [ ] Add startup commands for migrations and static collection where needed.
 - [ ] Document local startup:
   - [ ] create `.env`
@@ -216,13 +216,13 @@ The work is intentionally split into small, checkable steps so it can be impleme
   - [ ] environment variables
   - [ ] test commands
   - [x] worker operation
-  - [ ] Docker Compose usage
+  - [x] Docker Compose usage
 
 ### 11. Final verification pass
 
-- [ ] Run formatting, linting, and tests.
+- [x] Run formatting, linting, and tests.
 - [ ] Run migrations from a clean database.
-- [ ] Bring the stack up with Docker Compose.
+- [x] Bring the stack up with Docker Compose.
 - [ ] Manually verify:
   - [ ] first-login pending user flow
   - [ ] admin approval flow

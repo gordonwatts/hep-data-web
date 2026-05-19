@@ -31,6 +31,25 @@ To create and execute a single smoke-test job against the backend:
 uv run python manage.py run_smoke_job
 ```
 
+## Docker
+
+The Compose stack includes `web`, `worker`, `postgres`, and a local Docker daemon
+for backend job execution.
+
+```powershell
+copy .env.example .env
+docker compose up --build
+```
+
+Once the stack is up, you can smoke-test the backend from inside the container:
+
+```powershell
+docker compose exec web uv run python manage.py run_smoke_job
+```
+
+If the backend image is not already available on your machine, set
+`HEP_DATA_LLM_DOCKER_IMAGE` in `.env` to the image tag you want the worker to use.
+
 ## Local Login
 
 The app uses Django's built-in login views for now. Create a user with:

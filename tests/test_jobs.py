@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -107,3 +108,19 @@ class ArtifactConventionTests(TestCase):
         )
         assert artifact.is_canonical is True
         assert artifact.job == job
+
+    def test_backend_command_uses_configured_docker_image(self):
+        user = get_user_model().objects.create_user(username="docker-user")
+        job = Job.objects.create(
+            owner=user,
+            original_prompt="prompt",
+            resolved_dataset="dataset",
+            backend_profile="rdf",
+            status=JobStatus.RUNNING,
+        )
+        with patch.object(services.settings, "HEP_DATA_LLM_DOCKER_IMAGE", "custom/image:tag"):
+            command = services._backend_command_for_job(
+                job, services.artifact_path_for_job(job, "result.md")
+            )
+        assert "--docker-image" in command
+        assert "custom/image:tag" in command
