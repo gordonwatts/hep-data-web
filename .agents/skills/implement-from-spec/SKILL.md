@@ -102,6 +102,8 @@ If a verification step cannot be run:
 - Do not bypass agreed architecture or repository guidance without calling out why.
 - Prefer incremental progress over speculative large refactors.
 - If the user says “continue,” resume from the next unchecked item unless another next step is clearly safer.
+- After each meaningful completed work chunk, create a checkpoint commit before moving on.
+- Keep the implementation checklist updated as work lands so progress is visible at a glance.
 
 ## Stopping points
 
@@ -111,6 +113,7 @@ Prefer stopping after:
 - tests are green
 - docs and checklist state are updated
 - the next step is clear
+- a checkpoint commit has been created for the completed chunk
 
 Avoid stopping:
 
