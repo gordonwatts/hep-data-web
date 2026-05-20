@@ -11,18 +11,14 @@ requires-python = ">=3.12"
 dependencies = [
   "Django>=5.1,<5.2",
   "gunicorn>=23.0,<24.0",
-  "hep-data-llm==1.1.1",
+  "hep-data-llm==2.0.0",
   "psycopg[binary]>=3.2,<4.0",
   "PyYAML>=6.0,<7.0",
   "whitenoise>=6.7,<7.0",
 ]
 
 [project.optional-dependencies]
-dev = [
-  "pytest>=8.3,<9.0",
-  "pytest-django>=4.9,<5.0",
-  "ruff>=0.6,<0.7",
-]
+dev = ["pytest>=8.3,<9.0", "pytest-django>=4.9,<5.0", "ruff>=0.6,<0.7"]
 
 [tool.setuptools]
 include-package-data = true
