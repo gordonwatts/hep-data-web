@@ -65,3 +65,68 @@ class JobArtifact(models.Model):
 
     def __str__(self) -> str:
         return f"{self.artifact_kind} for job {self.job_id}"
+
+
+class ApprovalState(models.TextChoices):
+    PENDING = "pending", "Pending"
+    APPROVED = "approved", "Approved"
+    REJECTED = "rejected", "Rejected"
+
+
+class UserRole(models.TextChoices):
+    USER = "user", "User"
+    ADMIN = "admin", "Admin"
+
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile"
+    )
+    github_id = models.CharField(max_length=32, unique=True, null=True, blank=True)
+    github_login = models.CharField(max_length=255, blank=True)
+    github_avatar_url = models.URLField(blank=True)
+    github_email = models.EmailField(blank=True)
+    role = models.CharField(
+        max_length=16, choices=UserRole.choices, default=UserRole.USER, db_index=True
+    )
+    approval_state = models.CharField(
+        max_length=16,
+        choices=ApprovalState.choices,
+        default=ApprovalState.PENDING,
+        db_index=True,
+    )
+    pending_notified_at = models.DateTimeField(null=True, blank=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    rejected_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-pk"]
+
+    def __str__(self) -> str:
+        return f"Profile for {self.user}"
+
+    @property
+    def is_approved(self) -> bool:
+        return self.approval_state == ApprovalState.APPROVED
+
+    @property
+    def is_pending(self) -> bool:
+        return self.approval_state == ApprovalState.PENDING
+
+    @property
+    def is_rejected(self) -> bool:
+        return self.approval_state == ApprovalState.REJECTED
+
+
+def get_or_create_profile_for_user(user):
+    profile_defaults = {
+        "role": UserRole.ADMIN if user.is_staff or user.is_superuser else UserRole.USER,
+        "approval_state": ApprovalState.APPROVED
+        if user.is_staff or user.is_superuser
+        else ApprovalState.PENDING,
+    }
+    profile, _ = UserProfile.objects.get_or_create(user=user, defaults=profile_defaults)
+    return profile

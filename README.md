@@ -57,13 +57,23 @@ directory, such as the mounted path inside Docker Compose.
 
 ## Local Login
 
-The app uses Django's built-in login views for now. Create a user with:
+GitHub OAuth is the default login flow. Put your local development secrets in the
+repository root `.env` file, then configure your GitHub OAuth app to use:
+
+- Authorization callback URL: `http://localhost:8000/accounts/github/callback/`
+- Scopes: `read:user` and `user:email`
+
+The minimum `.env` entries for login are:
 
 ```powershell
-uv run python manage.py createsuperuser
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
+ADMIN_EMAILS=...
 ```
 
-Then log in at `/accounts/login/` and submit jobs from the homepage.
+The app sends approval notifications to the addresses listed in `ADMIN_EMAILS`.
+For local manual testing you can still create a Django superuser for the built-in
+admin site, which now lives at `/admin-panel/`.
 
 ## Tests
 

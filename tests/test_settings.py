@@ -1,11 +1,35 @@
 import importlib
 
+from hep_data_web.env import load_env_file
 from hep_data_web.settings import base
 
 
 def test_csv_env_parses_and_trims(monkeypatch):
     monkeypatch.setenv("TEST_LIST", "alpha, beta , ,gamma")
     assert base.csv_env("TEST_LIST") == ["alpha", "beta", "gamma"]
+
+
+def test_load_env_file_populates_missing_values(tmp_path, monkeypatch):
+    env_file = tmp_path / ".env"
+    env_file.write_text("ALPHA=one\nBETA='two'\n# comment\n", encoding="utf-8")
+
+    monkeypatch.delenv("ALPHA", raising=False)
+    monkeypatch.delenv("BETA", raising=False)
+
+    load_env_file(env_file)
+
+    assert base.os.environ["ALPHA"] == "one"
+    assert base.os.environ["BETA"] == "two"
+
+
+def test_load_env_file_does_not_overwrite_existing_values(tmp_path, monkeypatch):
+    env_file = tmp_path / ".env"
+    env_file.write_text("ALPHA=from-file\n", encoding="utf-8")
+
+    monkeypatch.setenv("ALPHA", "from-env")
+    load_env_file(env_file)
+
+    assert base.os.environ["ALPHA"] == "from-env"
 
 
 def test_database_settings_parses_postgres_url(monkeypatch):

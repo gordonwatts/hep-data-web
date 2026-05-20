@@ -4,7 +4,8 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from portal.models import Job, JobStatus
+from portal.auth import SESSION_APPROVED_LOGIN_KEY
+from portal.models import ApprovalState, Job, JobStatus, get_or_create_profile_for_user
 
 
 class PortalFlowTests(TestCase):
@@ -13,8 +14,17 @@ class PortalFlowTests(TestCase):
         self.owner = user_model.objects.create_user(username="owner", password="secret")
         self.other = user_model.objects.create_user(username="other", password="secret")
 
+    def _force_approved_login(self, user):
+        profile = get_or_create_profile_for_user(user)
+        profile.approval_state = ApprovalState.APPROVED
+        profile.save(update_fields=["approval_state"])
+        self.client.force_login(user)
+        session = self.client.session
+        session[SESSION_APPROVED_LOGIN_KEY] = True
+        session.save()
+
     def test_submit_job_redirects_to_result_page(self):
-        self.client.force_login(self.owner)
+        self._force_approved_login(self.owner)
 
         with patch("portal.services.default_dataset", return_value="default-dataset"):
             response = self.client.post(
@@ -46,13 +56,13 @@ class PortalFlowTests(TestCase):
             status=JobStatus.COMPLETED,
         )
 
-        self.client.force_login(self.other)
+        self._force_approved_login(self.other)
         response = self.client.get(
             reverse("job-detail", kwargs={"submission_id": job.submission_id})
         )
         self.assertEqual(response.status_code, 404)
 
-        self.client.force_login(self.owner)
+        self._force_approved_login(self.owner)
         response = self.client.get(
             reverse("job-detail", kwargs={"submission_id": job.submission_id})
         )
@@ -67,7 +77,7 @@ class PortalFlowTests(TestCase):
             backend_profile="rdf",
             status=JobStatus.COMPLETED,
         )
-        self.client.force_login(self.owner)
+        self._force_approved_login(self.owner)
 
         response = self.client.post(
             reverse("job-clone", kwargs={"submission_id": source_job.submission_id}),

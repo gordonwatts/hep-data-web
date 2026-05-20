@@ -3,11 +3,21 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from portal.auth import SESSION_APPROVED_LOGIN_KEY
 from portal.backend import ExampleQuestion
-from portal.models import Job, JobStatus
+from portal.models import ApprovalState, Job, JobStatus, get_or_create_profile_for_user
 
 
 class HomePageUITests(TestCase):
+    def _force_approved_login(self, user):
+        profile = get_or_create_profile_for_user(user)
+        profile.approval_state = ApprovalState.APPROVED
+        profile.save(update_fields=["approval_state"])
+        self.client.force_login(user)
+        session = self.client.session
+        session[SESSION_APPROVED_LOGIN_KEY] = True
+        session.save()
+
     def test_home_page_shows_example_prompts(self):
         with patch(
             "portal.views.load_example_questions",
@@ -56,7 +66,7 @@ class HomePageUITests(TestCase):
                 backend_profile="rdf",
                 status=JobStatus.RUNNING,
             )
-            self.client.force_login(user)
+            self._force_approved_login(user)
 
             response = self.client.get("/")
 

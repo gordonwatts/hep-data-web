@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Account status{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-body p-4 p-md-5">
+          <p class="text-uppercase text-accent fw-semibold small mb-2">Access control</p>
+          <h1 class="h4 mb-3">Your account status</h1>
+          <dl class="row mb-4">
+            <dt class="col-sm-4">GitHub account</dt>
+            <dd class="col-sm-8">{{ profile.github_login|default:request.user.get_username }}</dd>
+            <dt class="col-sm-4">Approval state</dt>
+            <dd class="col-sm-8">
+              <span class="badge text-bg-{% if profile.is_approved %}success{% elif profile.is_rejected %}danger{% else %}warning{% endif %}">
+                {{ profile.get_approval_state_display }}
+              </span>
+            </dd>
+            <dt class="col-sm-4">Current session</dt>
+            <dd class="col-sm-8">
+              {% if app_access_granted %}
+                <span class="badge text-bg-success">Approved for app access</span>
+              {% else %}
+                <span class="badge text-bg-secondary">Needs a fresh login</span>
+              {% endif %}
+            </dd>
+          </dl>
+
+          {% if profile.is_pending %}
+            <div class="alert alert-warning">
+              Your account is waiting for an administrator to approve it.
+            </div>
+          {% elif profile.is_rejected %}
+            <div class="alert alert-danger">
+              Your account was rejected. Please contact an administrator if you think this is a mistake.
+            </div>
+          {% elif profile.is_approved and not app_access_granted %}
+            <div class="alert alert-info">
+              Your account was approved, but this session still needs to be refreshed. Log out and sign in again.
+            </div>
+          {% endif %}
+
+          <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-primary" href="{{ github_login_url }}">Sign in again with GitHub</a>
+            <a class="btn btn-outline-secondary" href="{{ logout_url }}">Log out</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

@@ -93,15 +93,15 @@ The work is intentionally split into small, checkable steps so it can be impleme
 
 ### 3. Authentication and approval flow
 
-- [ ] Add GitHub OAuth authentication.
-- [ ] Create `UserProfile` with role and approval state.
-- [ ] On first login, create a pending profile instead of granting access.
-- [ ] Block pending and rejected users from normal app pages.
-- [ ] Send admin notification email when a new user becomes pending.
-- [ ] Build admin approval list page.
-- [ ] Add approve and reject actions.
-- [ ] Send user notification email after approval or rejection.
-- [ ] Add tests for login, pending state, approval, rejection, and permission boundaries.
+- [x] Add GitHub OAuth authentication.
+- [x] Create `UserProfile` with role and approval state.
+- [x] On first login, create a pending profile instead of granting access.
+- [x] Block pending and rejected users from normal app pages.
+- [x] Send admin notification email when a new user becomes pending.
+- [x] Build admin approval list page.
+- [x] Add approve and reject actions.
+- [x] Send user notification email after approval or rejection.
+- [x] Add tests for login, pending state, approval, rejection, and permission boundaries.
 
 ### 4. Backend integration scaffolding
 
@@ -181,7 +181,7 @@ The work is intentionally split into small, checkable steps so it can be impleme
 
 ### 8. Admin UI
 
-- [ ] Build admin user approval page.
+- [x] Build admin user approval page.
 - [ ] Build admin global job/queue page.
 - [ ] Add admin-only job inspection.
 - [ ] Add admin cancel action.
@@ -239,18 +239,18 @@ The work is intentionally split into small, checkable steps so it can be impleme
 
 ### Unit tests
 
-- [ ] User approval state transitions
+- [x] User approval state transitions
 - [x] Queue limit logic
 - [x] Queue position logic
 - [x] Default dataset injection
 - [x] Backend profile validation
 - [ ] Worker state transitions
 - [x] Artifact metadata handling
-- [ ] Permission helpers
+- [x] Permission helpers
 
 ### Integration tests
 
-- [ ] OAuth callback flow with mocked provider
+- [x] OAuth callback flow with mocked provider
 - [ ] Job submission → worker processing → result availability
 - [ ] Failure path preserving generated code and error message
 - [ ] Email notifications for terminal states
