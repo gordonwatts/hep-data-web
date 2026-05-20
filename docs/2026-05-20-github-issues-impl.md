@@ -287,7 +287,7 @@ This plan keeps the existing architecture. Do not execute analysis work from HTT
 
 ### 9. Continuous Integration and Release Automation (Issue #2)
 
-- [ ] Add `.github/workflows/ci.yml`.
+- [x] Add `.github/workflows/ci.yml`.
   - Trigger on pull requests and pushes to `main`.
   - Use `actions/checkout`.
   - Install `uv`.
@@ -296,17 +296,17 @@ This plan keeps the existing architecture. Do not execute analysis work from HTT
   - Run `uv run pytest`.
   - Run `uv run ruff check .`.
   - Run `uv run ruff format --check .`.
-- [ ] Add `.github/workflows/release.yml`.
+- [x] Add `.github/workflows/release.yml`.
   - Trigger manually with `workflow_dispatch`, and optionally on published GitHub releases.
   - Build multi-arch Docker image for `linux/amd64` and `linux/arm64`.
   - Use Docker Buildx.
   - Authenticate with registry using GitHub Actions secrets.
   - Push only on the release trigger, not every branch push.
-- [ ] Document required secrets in `README.md` or `docs/azure-deployment.md`.
+- [x] Document required secrets in `README.md` or `docs/azure-deployment.md`.
   - Registry server/username/password or token.
   - Image namespace/name.
   - Any Azure publish credentials if used later.
-- [ ] Add a CI status note to `README.md`.
+- [x] Add a CI status note to `README.md`.
   - Keep it concise.
 - [ ] Validate locally before committing.
   - Run `uv run pytest`.

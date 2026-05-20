@@ -84,3 +84,13 @@ uv run pytest
 uv run ruff check .
 uv run ruff format --check .
 ```
+
+GitHub Actions runs the same test, lint, and formatting checks on pull requests
+and pushes to `main`.
+
+For the release image workflow, configure these repository secrets:
+
+- `REGISTRY_SERVER`
+- `REGISTRY_USERNAME`
+- `REGISTRY_PASSWORD`
+- `IMAGE_NAME`
