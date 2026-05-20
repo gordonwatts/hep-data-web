@@ -66,3 +66,8 @@ def test_base_settings_expose_docker_execution_overrides(monkeypatch):
     monkeypatch.delenv("HEP_DATA_LLM_REPAIR_CYCLES", raising=False)
     monkeypatch.delenv("HEP_DATA_LLM_SERVICEX_AWKWARD_DOCKER_IMAGE", raising=False)
     importlib.reload(base)
+
+
+def test_base_settings_default_job_poll_interval_is_one():
+    module = importlib.reload(base)
+    assert module.JOB_POLL_INTERVAL_SECONDS == 1

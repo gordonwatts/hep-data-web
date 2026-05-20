@@ -51,7 +51,8 @@
         return;
       }
 
-      const interval = Number(panel.dataset.pollInterval || "{{ poll_interval_seconds }}") || 2000;
+      const intervalSeconds = Number(panel.dataset.pollInterval || "{{ poll_interval_seconds }}") || 1;
+      const interval = intervalSeconds * 1000;
       const pollUrl = panel.dataset.pollUrl;
 
       const scheduleRefresh = () => {

@@ -90,6 +90,7 @@ class PortalFlowTests(TestCase):
         self.assertContains(response, "<time", html=False)
         self.assertContains(response, 'datetime="', html=False)
         self.assertContains(response, "UTC")
+        self.assertContains(response, "* 1000", html=False)
 
     def test_job_detail_partial_enforces_owner_visibility(self):
         job = Job.objects.create(
