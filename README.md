@@ -79,6 +79,16 @@ The app sends approval notifications to the addresses listed in `ADMIN_EMAILS`.
 For local manual testing you can still create a Django superuser for the built-in
 admin site, which now lives at `/admin-panel/`.
 
+```powershell
+uv run python manage.py createsuperuser
+```
+
+If you are running the Docker Compose stack, use:
+
+```powershell
+docker compose exec web uv run python manage.py createsuperuser
+```
+
 ## Tests
 
 ```powershell
