@@ -59,6 +59,11 @@ directory so `~/servicex.yaml` works as expected. The `HEP_DATA_LLM_HOME_DIR`
 override is only needed when you want to point the backend at a different home
 directory, such as the mounted path inside Docker Compose.
 
+## Azure Deployment
+
+For Azure setup, teardown, certificates, and persistent-data deletion, see
+[docs/azure-deployment.md](docs/azure-deployment.md).
+
 ## Local Login
 
 GitHub OAuth is the default login flow. Put your local development secrets in the
@@ -112,3 +117,7 @@ For the release image workflow, configure these repository secrets:
 - `REGISTRY_USERNAME`
 - `REGISTRY_PASSWORD`
 - `IMAGE_NAME`
+
+The workflow publishes on GitHub release publication and tags the image with
+the release version plus `latest`. If you run it manually, provide the release
+tag in the workflow input.
