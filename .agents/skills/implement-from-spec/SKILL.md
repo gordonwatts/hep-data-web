@@ -46,6 +46,26 @@ When creating or revising an implementation plan:
 
 Use [references/checklist-template.md](references/checklist-template.md) when a lightweight checklist skeleton is useful.
 
+### Implementation plan shape
+
+When the user asks for a full implementation plan from a spec, create an artifact shaped like the repository's existing implementation plans, such as `docs/plan-v1-impl.md`.
+
+Prefer these sections when they fit the work:
+
+- `Summary`: a short explanation of the intended outcome and major behavior areas.
+- `Chosen Defaults`: concrete technology, architecture, UI, storage, deployment, or operational choices needed to avoid ambiguity.
+- `Public Interfaces / Core Concepts`: routes, commands, models, modules, processes, configuration variables, or other contract points future implementers need to know.
+- `Implementation Checklist`: ordered, numbered sections with checkboxes for small implementation steps.
+- `Test Plan`: focused unit, integration, UI, manual, and CI verification expectations.
+- `Assumptions`: explicit decisions, constraints, or deferred questions that future implementers should not have to rediscover.
+
+For issue-driven plans:
+
+- Group related issues into coherent implementation sections rather than blindly ordering by issue number.
+- Include the relevant issue numbers in section headings or checklist items where useful.
+- Make each checklist item specific enough that a later agent can implement it, verify it, and mark it complete without rereading the entire spec.
+- Preserve any user-approved scope decisions from the spec, especially when they intentionally choose a simpler behavior over a new abstraction.
+
 ## Execute from plan
 
 When implementing from an existing plan:
@@ -103,6 +123,8 @@ If a verification step cannot be run:
 - Prefer incremental progress over speculative large refactors.
 - If the user says “continue,” resume from the next unchecked item unless another next step is clearly safer.
 - After each meaningful completed work chunk, create a checkpoint commit before moving on.
+- When a commit fully addresses a GitHub issue, include GitHub's auto-closing syntax in the commit message body, for example `Fix #3`, `Fixes #3`, or `Closes #3`. If one commit fully addresses multiple issues, include one closing reference for each issue, such as `Fix #3` and `Fix #4`.
+- Do not add auto-closing syntax for partial work; mention the issue normally without `Fix`, `Fixes`, or `Closes` until the issue is actually complete.
 - Keep the implementation checklist updated as work lands so progress is visible at a glance.
 
 ## Stopping points
