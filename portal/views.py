@@ -4,6 +4,7 @@ import mimetypes
 from pathlib import Path
 from random import sample
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.decorators import login_required
@@ -93,6 +94,31 @@ def _job_history_rows(request):
         }
         for job in jobs
     ]
+
+
+def _job_detail_context(request, job: Job) -> dict[str, object]:
+    artifacts = list(job.artifacts.all().order_by("created_at", "pk"))
+    image_artifacts = [
+        artifact
+        for artifact in artifacts
+        if mimetypes.guess_type(artifact.path)[0] in {"image/png", "image/jpeg", "image/gif"}
+        or artifact.path.lower().endswith(".png")
+    ]
+    report_artifact = next((artifact for artifact in artifacts if artifact.is_canonical), None)
+    return {
+        "job": job,
+        "report_artifact": report_artifact,
+        "artifacts": artifacts,
+        "image_artifacts": image_artifacts,
+        "queue_position": job.queue_position,
+        "badge_class": _job_badge_class(job.status),
+        "submitted_at": job.submitted_at,
+        "started_at": job.started_at,
+        "completed_at": job.completed_at,
+        "is_terminal": job.status not in {JobStatus.QUEUED, JobStatus.RUNNING},
+        "poll_url": reverse("job-detail-status", kwargs={"submission_id": job.submission_id}),
+        "poll_interval_seconds": settings.JOB_POLL_INTERVAL_SECONDS,
+    }
 
 
 def _admin_profile_or_403(request):
@@ -322,30 +348,19 @@ def submit_job(request):
 @login_required
 def job_detail(request, submission_id):
     job = _job_or_404(request, submission_id)
-    artifacts = list(job.artifacts.all().order_by("created_at", "pk"))
-    image_artifacts = [
-        artifact
-        for artifact in artifacts
-        if mimetypes.guess_type(artifact.path)[0] in {"image/png", "image/jpeg", "image/gif"}
-        or artifact.path.lower().endswith(".png")
-    ]
-    report_artifact = next((artifact for artifact in artifacts if artifact.is_canonical), None)
-
     return render(
         request,
         "portal/job_detail.html",
-        {
-            "job": job,
-            "report_artifact": report_artifact,
-            "artifacts": artifacts,
-            "image_artifacts": image_artifacts,
-            "queue_position": job.queue_position,
-            "badge_class": _job_badge_class(job.status),
-            "submitted_at": timezone.localtime(job.submitted_at),
-            "started_at": timezone.localtime(job.started_at) if job.started_at else None,
-            "completed_at": timezone.localtime(job.completed_at) if job.completed_at else None,
-        },
+        _job_detail_context(request, job),
     )
+
+
+@login_required
+def job_detail_partial(request, submission_id):
+    job = _job_or_404(request, submission_id)
+    response = render(request, "portal/_job_detail_panel.html", _job_detail_context(request, job))
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 @login_required

@@ -49,8 +49,14 @@
           </div>
           <div class="d-grid gap-2">
             {% for example in example_questions %}
-              <button type="button" class="btn btn-outline-primary text-start example-prompt" data-example-prompt="{{ example.prompt|escape }}">
-                {{ example.title|default:example.prompt }}
+              <button
+                type="button"
+                class="btn btn-outline-primary text-start example-prompt"
+                data-example-prompt="{{ example.prompt|escape }}"
+                title="{{ example.prompt|escape }}"
+                aria-label="{{ example.prompt|escape }}"
+              >
+                <span class="example-prompt-text">{{ example.title|default:example.prompt }}</span>
               </button>
             {% empty %}
               <div class="text-muted">No bundled examples were found.</div>

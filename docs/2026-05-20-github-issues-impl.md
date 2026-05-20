@@ -214,73 +214,73 @@ This plan keeps the existing architecture. Do not execute analysis work from HTT
 
 ### 6. Live Job Status Updates (Issue #5)
 
-- [ ] Create `templates/portal/_job_detail_panel.html`.
+- [x] Create `templates/portal/_job_detail_panel.html`.
   - Move the main job state region from `job_detail.html` into the include.
   - Include status badge, queue position, timestamps, failure message, metadata, image previews, report download link, generated code, and artifacts list.
   - Keep user-visible behavior equivalent for full page render.
-- [ ] Update `templates/portal/job_detail.html`.
+- [x] Update `templates/portal/job_detail.html`.
   - Render the include inside a wrapper, for example `<section id="job-detail-panel">`.
   - If job is queued or running, add polling attributes or a small script.
   - Poll only while `job.status` is `queued` or `running`.
-- [ ] Add `portal.views.job_detail_partial`.
+- [x] Add `portal.views.job_detail_partial`.
   - Use `_job_or_404` for permission checks.
   - Recompute artifacts and timestamps with the same helper used by full `job_detail`.
   - Return the include template.
   - Add a `Cache-Control: no-store` header if convenient.
-- [ ] Refactor duplicated job-detail context into helper in `portal.views`.
+- [x] Refactor duplicated job-detail context into helper in `portal.views`.
   - Suggested helper: `_job_detail_context(request, job)`.
   - Use it from both full and partial views.
-- [ ] Add route in `portal/urls.py`.
+- [x] Add route in `portal/urls.py`.
   - Suggested path: `jobs/<uuid:submission_id>/status/`, name `job-detail-status`.
-- [ ] Add polling implementation.
+- [x] Add polling implementation.
   - HTMX option: add the HTMX script in `base.html`; set `hx-get`, `hx-trigger="load delay:2s"`, `hx-swap="outerHTML"` on a wrapper that re-renders itself while active.
   - Vanilla option: use `fetch` every `JOB_POLL_INTERVAL_SECONDS` and replace `#job-detail-panel` until a `data-terminal="true"` attribute appears.
   - Keep the implementation simple and testable by checking rendered attributes.
-- [ ] Add `tests/test_portal_flow.py` permission tests.
+- [x] Add `tests/test_portal_flow.py` permission tests.
   - Owner can GET partial endpoint.
   - Other user gets 404 for partial endpoint.
   - Partial includes queued/running/completed/failed state text.
-- [ ] Add result update test.
+- [x] Add result update test.
   - Completed job with artifact returns download link and generated code in partial response.
 
 ### 7. Localized Timestamp Display (Issue #1)
 
-- [ ] Add a template helper pattern for timestamps.
+- [x] Add a template helper pattern for timestamps.
   - Minimal approach: in templates, render:
     - `<time class="js-local-time" datetime="{{ value|date:'c' }}">UTC fallback text</time>`
     - Include visible fallback with `UTC`.
   - Avoid introducing a custom Django template tag unless duplication becomes hard to maintain.
-- [ ] Update `portal.views`.
+- [x] Update `portal.views`.
   - Stop converting timestamps with `timezone.localtime` for user-facing display contexts where browser localization is expected.
   - Pass timezone-aware UTC datetimes or ISO strings.
   - Keep server fallback text explicit as UTC.
-- [ ] Update `templates/base.html`.
+- [x] Update `templates/base.html`.
   - Add JavaScript that finds `.js-local-time`, parses `datetime`, formats with `Intl.DateTimeFormat`, and appends a timezone label from `Intl.DateTimeFormat().resolvedOptions().timeZone` or `timeZoneName: "short"`.
   - Leave fallback text untouched if parsing fails or JavaScript is disabled.
-- [ ] Update `templates/portal/job_detail.html` and `_job_detail_panel.html`.
+- [x] Update `templates/portal/job_detail.html` and `_job_detail_panel.html`.
   - Apply timestamp markup to submitted, started, and completed times.
-- [ ] Update `templates/portal/home.html` if history displays timestamps.
+- [x] Update `templates/portal/home.html` if history displays timestamps.
   - Current history table does not show submitted time; add it only if useful and covered by tests, otherwise no change needed there.
-- [ ] Add tests.
+- [x] Add tests.
   - `tests/test_portal_flow.py`: job detail response contains `<time` and `datetime=`.
   - Assert fallback includes `UTC`.
   - Do not try to test browser timezone rendering in Django unit tests.
 
 ### 8. Example Prompt Presentation (Issue #7)
 
-- [ ] Update `templates/portal/home.html`.
+- [x] Update `templates/portal/home.html`.
   - Constrain example button text with Bootstrap/utilities and a small custom class if needed.
   - Preserve `data-example-prompt="{{ example.prompt|escape }}"`.
   - Add `title="{{ example.prompt|escape }}"` or an accessible details/summary area so the full prompt is available.
   - If using truncation, add visually clear text such as `View full prompt` with a collapsed details element or Bootstrap collapse.
-- [ ] Add CSS in `templates/base.html` or `home.html`.
+- [x] Add CSS in `templates/base.html` or `home.html`.
   - Keep it minimal and theme-consistent.
   - Suggested class: `.example-prompt-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }`
   - Also set `overflow-wrap: anywhere;` for dataset-like strings.
-- [ ] Preserve click behavior.
+- [x] Preserve click behavior.
   - Clicking the example button must still populate `#prompt` with the full prompt.
   - If the full prompt affordance is nested, ensure it does not break selection.
-- [ ] Update `tests/test_home_ui.py`.
+- [x] Update `tests/test_home_ui.py`.
   - Long prompt response contains the full prompt in `data-example-prompt`.
   - Long prompt response contains truncation/accessibility attributes or full prompt affordance.
   - Existing clickable example behavior remains represented in rendered JavaScript/data attributes.

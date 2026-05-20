@@ -28,6 +28,22 @@ class HomePageUITests(TestCase):
         self.assertContains(response, "Example prompts")
         self.assertContains(response, "ETmiss")
 
+    def test_home_page_truncates_long_example_prompts(self):
+        long_prompt = (
+            "Plot the distribution of missing transverse energy for the full dataset "
+            "with a detailed breakdown by lepton flavor, jet multiplicity, and event "
+            "selection in a way that stays readable in the prompt list."
+        )
+        with patch(
+            "portal.views.load_example_questions",
+            return_value=[ExampleQuestion(prompt=long_prompt, title=long_prompt)],
+        ):
+            response = self.client.get("/")
+
+        self.assertContains(response, "example-prompt-text")
+        self.assertContains(response, "title=")
+        self.assertContains(response, long_prompt)
+
     def test_home_page_shows_only_three_random_examples(self):
         with (
             patch(

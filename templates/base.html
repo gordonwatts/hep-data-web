@@ -32,6 +32,17 @@
         padding: 1rem;
         overflow-x: auto;
       }
+      .example-prompt-text {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        white-space: normal;
+      }
+      .js-local-time {
+        white-space: nowrap;
+      }
       .text-accent {
         color: var(--portal-accent);
       }
@@ -72,5 +83,28 @@
     </main>
     <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.10.0/lib/highlight.min.js"></script>
     <script>hljs.highlightAll();</script>
+    <script>
+      window.portalLocalizeTimes = (root) => {
+        (root || document).querySelectorAll(".js-local-time").forEach((element) => {
+          const rawValue = element.getAttribute("datetime");
+          if (!rawValue) {
+            return;
+          }
+
+          const parsed = new Date(rawValue);
+          if (Number.isNaN(parsed.getTime())) {
+            return;
+          }
+
+          const formatter = new Intl.DateTimeFormat(undefined, {
+            dateStyle: "medium",
+            timeStyle: "short",
+          });
+          const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          element.textContent = `${formatter.format(parsed)}${timeZone ? ` ${timeZone}` : ""}`;
+        });
+      };
+      window.portalLocalizeTimes(document);
+    </script>
   </body>
 </html>

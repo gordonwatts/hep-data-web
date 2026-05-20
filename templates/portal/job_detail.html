@@ -5,89 +5,7 @@
 {% block content %}
   <div class="row g-4">
     <div class="col-lg-8">
-      <div class="card shadow-sm mb-4">
-        <div class="card-body p-4 p-md-5">
-          <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
-            <div>
-              <h1 class="h4 mb-2">Job result</h1>
-              <p class="mb-0 text-muted">Submission {{ job.submission_id }}</p>
-            </div>
-            <div class="text-end">
-              <div class="badge {{ badge_class }}">{{ job.get_status_display }}</div>
-              {% if queue_position %}
-                <div class="small text-muted mt-2">Queue position {{ queue_position }}</div>
-              {% endif %}
-            </div>
-          </div>
-
-          <dl class="row mb-4">
-            <dt class="col-sm-3">Prompt</dt>
-            <dd class="col-sm-9">{{ job.original_prompt }}</dd>
-            <dt class="col-sm-3">Dataset</dt>
-            <dd class="col-sm-9">{{ job.resolved_dataset }}</dd>
-            <dt class="col-sm-3">Backend profile</dt>
-            <dd class="col-sm-9">{{ job.get_backend_profile_display }}</dd>
-            <dt class="col-sm-3">Submitted</dt>
-            <dd class="col-sm-9">{{ submitted_at }}</dd>
-            <dt class="col-sm-3">Started</dt>
-            <dd class="col-sm-9">{{ started_at|default:"-" }}</dd>
-            <dt class="col-sm-3">Completed</dt>
-            <dd class="col-sm-9">{{ completed_at|default:"-" }}</dd>
-            <dt class="col-sm-3">Runtime</dt>
-            <dd class="col-sm-9">{{ job.runtime|default:"-" }}</dd>
-          </dl>
-
-          {% if job.failure_message %}
-            <div class="alert alert-danger">
-              <strong>Failure message:</strong> {{ job.failure_message }}
-            </div>
-          {% endif %}
-
-          {% if job.result_metadata %}
-            <div class="card bg-light border-0 mb-4">
-              <div class="card-body">
-                <h2 class="h6 mb-3">Metadata</h2>
-                <dl class="row mb-0 small">
-                  {% for key, value in job.result_metadata.items %}
-                    <dt class="col-sm-4 text-muted">{{ key }}</dt>
-                    <dd class="col-sm-8 mb-2">{{ value }}</dd>
-                  {% endfor %}
-                </dl>
-              </div>
-            </div>
-          {% endif %}
-
-          {% if image_artifacts %}
-            <div class="mb-4">
-              <h2 class="h5 mb-3">Plot preview</h2>
-              <div class="row g-3">
-                {% for artifact in image_artifacts %}
-                  <div class="col-md-6">
-                    <div class="border rounded bg-white p-2">
-                      <img
-                        class="img-fluid rounded"
-                        src="{% url 'job-artifact-inline' submission_id=job.submission_id artifact_id=artifact.id %}"
-                        alt="{{ artifact.path }}"
-                      >
-                    </div>
-                  </div>
-                {% endfor %}
-              </div>
-            </div>
-          {% endif %}
-
-          {% if report_artifact %}
-            <div class="mb-4">
-              <a class="btn btn-outline-primary" href="{% url 'job-artifact-download' submission_id=job.submission_id artifact_id=report_artifact.id %}">Download report</a>
-            </div>
-          {% endif %}
-
-          <h2 class="h5 mb-3">Generated code</h2>
-          <div class="portal-code">
-            <pre class="mb-0"><code class="language-python">{{ job.generated_code|default:"No code captured yet." }}</code></pre>
-          </div>
-        </div>
-      </div>
+      {% include "portal/_job_detail_panel.html" %}
     </div>
 
     <div class="col-lg-4">
@@ -125,4 +43,46 @@
       </div>
     </div>
   </div>
+
+  <script>
+    (function () {
+      const panel = document.getElementById("job-detail-panel");
+      if (!panel || panel.dataset.terminal === "true") {
+        return;
+      }
+
+      const interval = Number(panel.dataset.pollInterval || "{{ poll_interval_seconds }}") || 2000;
+      const pollUrl = panel.dataset.pollUrl;
+
+      const scheduleRefresh = () => {
+        window.setTimeout(async () => {
+          const currentPanel = document.getElementById("job-detail-panel");
+          if (!currentPanel || currentPanel.dataset.terminal === "true") {
+            return;
+          }
+
+          try {
+            const response = await fetch(pollUrl, {
+              headers: {"X-Requested-With": "XMLHttpRequest"},
+            });
+            if (!response.ok) {
+              scheduleRefresh();
+              return;
+            }
+            currentPanel.outerHTML = await response.text();
+            window.portalLocalizeTimes(document);
+          } catch (error) {
+            // Keep polling until the job reaches a terminal state.
+          }
+
+          const replacement = document.getElementById("job-detail-panel");
+          if (replacement && replacement.dataset.terminal !== "true") {
+            scheduleRefresh();
+          }
+        }, interval);
+      };
+
+      scheduleRefresh();
+    })();
+  </script>
 {% endblock %}
