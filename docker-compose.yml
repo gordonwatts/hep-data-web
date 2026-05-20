@@ -23,7 +23,6 @@ services:
       USERPROFILE: /host-home
       TMPDIR: /tmp
       HEP_DATA_LLM_HOME_DIR: /host-home
-      HEP_DATA_LLM_SERVICEX_AWKWARD_DOCKER_IMAGE: hepdatallm-awkward:latest
     volumes:
       - type: bind
         source: ${USERPROFILE}
@@ -59,7 +58,6 @@ services:
       USERPROFILE: /host-home
       TMPDIR: /tmp
       HEP_DATA_LLM_HOME_DIR: /host-home
-      HEP_DATA_LLM_SERVICEX_AWKWARD_DOCKER_IMAGE: hepdatallm-awkward:latest
     volumes:
       - type: bind
         source: ${USERPROFILE}
@@ -95,7 +93,6 @@ services:
       USERPROFILE: /host-home
       TMPDIR: /tmp
       HEP_DATA_LLM_HOME_DIR: /host-home
-      HEP_DATA_LLM_SERVICEX_AWKWARD_DOCKER_IMAGE: hepdatallm-awkward:latest
     volumes:
       - type: bind
         source: ${USERPROFILE}
