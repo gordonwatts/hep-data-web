@@ -237,7 +237,6 @@ def auth_status(request):
             "app_access_granted": profile_has_app_access(
                 profile, session_approved=session_approved
             ),
-            "github_login_url": reverse("github-login"),
             "logout_url": reverse("logout"),
         },
     )

@@ -45,8 +45,6 @@
           <div class="d-flex flex-wrap gap-2">
             {% if app_access_granted %}
               <a class="btn btn-primary" href="{% url 'home' %}">Enter the app</a>
-            {% else %}
-              <a class="btn btn-primary" href="{{ github_login_url }}">Sign in again with GitHub</a>
             {% endif %}
             <a class="btn btn-outline-secondary" href="{{ logout_url }}">Log out</a>
           </div>

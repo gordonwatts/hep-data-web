@@ -123,6 +123,10 @@ class AuthFlowTests(TestCase):
             fetch_redirect_response=False,
         )
 
+        status_response = self.client.get(reverse("auth-status"))
+        self.assertNotContains(status_response, "Sign in again with GitHub")
+        self.assertNotContains(status_response, "Relogin with GitHub")
+
     def test_admin_can_approve_user_and_user_refreshes_into_app(self):
         target_user = get_user_model().objects.create_user(
             username="pending-user",
