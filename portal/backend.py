@@ -10,9 +10,8 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
-from django.conf import settings
-
 import yaml
+from django.conf import settings
 
 from hep_data_web.settings.base import env
 
@@ -132,6 +131,9 @@ def _dataset_from_prompt(prompt: str) -> str | None:
 
 def prompt_mentions_dataset(prompt: str) -> bool:
     if _dataset_from_prompt(prompt):
+        return True
+
+    if re.search(r"if this question does not specify a dataset,\s*use\b", prompt, re.IGNORECASE):
         return True
 
     if re.search(r"\brucio\s+dataset\b", prompt, re.IGNORECASE):

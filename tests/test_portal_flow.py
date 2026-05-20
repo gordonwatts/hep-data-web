@@ -158,7 +158,7 @@ class PortalFlowTests(TestCase):
 
         self.assertContains(response, "Completed")
         self.assertContains(response, "Download report")
-        self.assertContains(response, "print('ok')")
+        self.assertContains(response, "print(&#x27;ok&#x27;)", html=False)
         self.assertContains(response, 'data-terminal="true"', html=False)
 
     def test_job_detail_partial_renders_failed_state(self):
