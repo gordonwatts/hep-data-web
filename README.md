@@ -86,6 +86,12 @@ uv run python manage.py createsuperuser
 If you are running the Docker Compose stack, use:
 
 ```powershell
+docker compose up --build
+```
+
+Then, in a second shell:
+
+```powershell
 docker compose exec web uv run python manage.py createsuperuser
 ```
 
