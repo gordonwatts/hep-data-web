@@ -35,6 +35,8 @@ uv run python manage.py run_smoke_job
 
 The Compose stack includes `web`, `worker`, `postgres`, and a local Docker daemon
 for backend job execution.
+On `docker compose up`, the stack also runs migrations automatically before the web
+and worker services start.
 
 ```powershell
 copy .env.example .env

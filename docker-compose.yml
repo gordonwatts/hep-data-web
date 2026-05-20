@@ -9,6 +9,40 @@ services:
       - docker_data:/var/lib/docker
       - analysis_tmp:/tmp
 
+  migrate:
+    build: .
+    command: uv run python manage.py migrate --noinput
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DJANGO_SETTINGS_MODULE: hep_data_web.settings.dev
+      DATABASE_URL: postgresql://hep_data_web:hep_data_web@postgres:5432/hep_data_web
+      DOCKER_HOST: tcp://docker:2375
+      HOME: /host-home
+      USERPROFILE: /host-home
+      TMPDIR: /tmp
+      HEP_DATA_LLM_HOME_DIR: /host-home
+      HEP_DATA_LLM_SERVICEX_AWKWARD_DOCKER_IMAGE: hepdatallm-awkward:latest
+    volumes:
+      - type: bind
+        source: ${USERPROFILE}
+        target: /host-home
+      - type: volume
+        source: media_data
+        target: /app/media
+      - type: volume
+        source: static_data
+        target: /app/staticfiles
+      - type: volume
+        source: analysis_tmp
+        target: /tmp
+    depends_on:
+      docker:
+        condition: service_started
+      postgres:
+        condition: service_started
+
   web:
     build: .
     command: uv run python manage.py runserver 0.0.0.0:8000
@@ -40,8 +74,12 @@ services:
         source: analysis_tmp
         target: /tmp
     depends_on:
-      - docker
-      - postgres
+      docker:
+        condition: service_started
+      postgres:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
 
   worker:
     build: .
@@ -72,8 +110,12 @@ services:
         source: analysis_tmp
         target: /tmp
     depends_on:
-      - docker
-      - postgres
+      docker:
+        condition: service_started
+      postgres:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
 
   postgres:
     image: postgres:16
