@@ -184,32 +184,32 @@ This plan keeps the existing architecture. Do not execute analysis work from HTT
 
 ### 5. Worker Crash and Restart Recovery (Issues #3 and #4)
 
-- [ ] Add a reusable failure message constant in `portal.services`.
+- [x] Add a reusable failure message constant in `portal.services`.
   - Suggested text: `This job failed because the worker stopped unexpectedly before it finished. The exact cause is unknown.`
-- [ ] Add `mark_stale_running_jobs_failed()` in `portal.services`.
+- [x] Add `mark_stale_running_jobs_failed()` in `portal.services`.
   - Filter `Job.objects.filter(status=JobStatus.RUNNING)`.
   - Mark each as `FAILED`, set `completed_at`, set `runtime` if `started_at` exists, clear `queue_position`, set the crash recovery failure message.
   - Call `refresh_queue_positions()` once after updates.
   - Return the number of recovered jobs for logging/tests.
-- [ ] Call startup recovery from `portal.management.commands.run_worker.Command.handle`.
+- [x] Call startup recovery from `portal.management.commands.run_worker.Command.handle`.
   - Execute once before entering the polling loop.
   - Write a concise stdout line if any jobs were recovered.
   - Do not claim or rerun recovered jobs.
-- [ ] Strengthen `portal.services.process_job`.
+- [x] Strengthen `portal.services.process_job`.
   - Current catchable exceptions already call `mark_job_failed(job, str(exc))`.
   - Ensure `refresh_queue_positions()` runs in every terminal path.
   - Consider adding a catch around artifact recording in `mark_job_completed` if artifact persistence can fail after backend success. If it fails, mark failed with a plain message.
-- [ ] Add `tests/test_worker.py` startup recovery tests.
+- [x] Add `tests/test_worker.py` startup recovery tests.
   - Running job becomes failed on `mark_stale_running_jobs_failed`.
   - Failure message matches the crash recovery message.
   - Queue positions exclude the recovered failed job.
   - A queued job remains queued and becomes position 1 after recovery.
-- [ ] Add `run_worker` command test.
+- [x] Add `run_worker` command test.
   - Create a running job.
   - Patch `claim_and_process_next_job` to return `None`.
   - Call `run_worker --once`.
   - Assert stale running job was failed and not processed.
-- [ ] Keep clone/edit/resubmit behavior unchanged.
+- [x] Keep clone/edit/resubmit behavior unchanged.
   - Existing `/jobs/<id>/clone/` is the supported recovery path.
 
 ### 6. Live Job Status Updates (Issue #5)

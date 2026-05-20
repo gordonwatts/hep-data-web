@@ -102,6 +102,53 @@ class WorkerServiceTests(TestCase):
         self.assertEqual(updated.status, JobStatus.FAILED)
         self.assertIn("boom", updated.failure_message)
 
+    def test_mark_stale_running_jobs_failed_moves_running_jobs_to_terminal_failure(self):
+        stale = Job.objects.create(
+            owner=self.user,
+            original_prompt="stale",
+            resolved_dataset="dataset",
+            backend_profile="rdf",
+            status=JobStatus.RUNNING,
+            started_at=timezone.now() - timedelta(minutes=5),
+            queue_position=1,
+        )
+        queued = Job.objects.create(
+            owner=self.user,
+            original_prompt="queued",
+            resolved_dataset="dataset",
+            backend_profile="rdf",
+            status=JobStatus.QUEUED,
+            queue_position=2,
+        )
+
+        recovered_count = services.mark_stale_running_jobs_failed()
+
+        self.assertEqual(recovered_count, 1)
+        stale.refresh_from_db()
+        queued.refresh_from_db()
+        self.assertEqual(stale.status, JobStatus.FAILED)
+        self.assertEqual(stale.failure_message, services.STALE_RUNNING_JOB_FAILURE_MESSAGE)
+        self.assertIsNotNone(stale.completed_at)
+        self.assertIsNotNone(stale.runtime)
+        self.assertEqual(queued.queue_position, 1)
+
+    def test_mark_stale_running_jobs_failed_leaves_non_running_jobs_alone(self):
+        queued = Job.objects.create(
+            owner=self.user,
+            original_prompt="queued",
+            resolved_dataset="dataset",
+            backend_profile="rdf",
+            status=JobStatus.QUEUED,
+            queue_position=1,
+        )
+
+        recovered_count = services.mark_stale_running_jobs_failed()
+
+        self.assertEqual(recovered_count, 0)
+        queued.refresh_from_db()
+        self.assertEqual(queued.status, JobStatus.QUEUED)
+        self.assertEqual(queued.queue_position, 1)
+
     def test_start_queued_job_rejects_nonqueued_jobs(self):
         job = Job.objects.create(
             owner=self.user,
@@ -160,3 +207,28 @@ class SmokeCommandTests(TestCase):
         self.assertTrue(
             Job.objects.filter(owner__username="smoke", status=JobStatus.COMPLETED).exists()
         )
+
+    def test_run_worker_recovers_stale_running_jobs_before_polling(self):
+        user = get_user_model().objects.create_user(username="recover")
+        Job.objects.create(
+            owner=user,
+            original_prompt="stale",
+            resolved_dataset="dataset",
+            backend_profile="rdf",
+            status=JobStatus.RUNNING,
+            started_at=timezone.now() - timedelta(minutes=3),
+        )
+
+        with (
+            patch(
+                "portal.management.commands.run_worker.services.claim_and_process_next_job",
+                return_value=None,
+            ),
+            patch("portal.management.commands.run_worker.time.sleep") as sleep_mock,
+        ):
+            call_command("run_worker", once=True, verbosity=0)
+
+        self.assertFalse(sleep_mock.called)
+        job = Job.objects.get(owner=user)
+        self.assertEqual(job.status, JobStatus.FAILED)
+        self.assertEqual(job.failure_message, services.STALE_RUNNING_JOB_FAILURE_MESSAGE)

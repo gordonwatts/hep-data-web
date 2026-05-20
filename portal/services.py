@@ -18,8 +18,8 @@ from portal.backend import (
     backend_repair_cycles,
     docker_image_for_profile,
     default_dataset,
-    render_job_prompt,
     prompt_mentions_dataset,
+    render_job_prompt,
     validate_backend_profile,
 )
 from portal.models import Job, JobStatus
@@ -27,6 +27,12 @@ from portal.models import Job, JobStatus
 
 class QueueFullError(RuntimeError):
     pass
+
+
+STALE_RUNNING_JOB_FAILURE_MESSAGE = (
+    "This job failed because the worker stopped unexpectedly before it finished. "
+    "The exact cause is unknown."
+)
 
 
 @dataclass(frozen=True)
@@ -220,7 +226,14 @@ def mark_job_completed(job: Job, result: JobExecutionResult) -> Job:
             "queue_position",
         ]
     )
-    record_job_artifacts(job, result)
+    try:
+        record_job_artifacts(job, result)
+    except Exception:
+        job.status = JobStatus.FAILED
+        job.failure_message = "The job finished, but the results could not be saved."
+        job.save(update_fields=["status", "failure_message"])
+        refresh_queue_positions()
+        return job
     refresh_queue_positions()
     return job
 
@@ -243,6 +256,37 @@ def mark_job_failed(job: Job, message: str) -> Job:
     )
     refresh_queue_positions()
     return job
+
+
+@transaction.atomic
+def mark_stale_running_jobs_failed() -> int:
+    stale_jobs = list(
+        Job.objects.select_for_update()
+        .filter(status=JobStatus.RUNNING)
+        .order_by("submitted_at", "pk")
+    )
+    recovered_count = 0
+    now = timezone.now()
+    for job in stale_jobs:
+        job.status = JobStatus.FAILED
+        job.completed_at = now
+        if job.started_at:
+            job.runtime = now - job.started_at
+        job.failure_message = STALE_RUNNING_JOB_FAILURE_MESSAGE
+        job.queue_position = None
+        job.save(
+            update_fields=[
+                "status",
+                "completed_at",
+                "runtime",
+                "failure_message",
+                "queue_position",
+            ]
+        )
+        recovered_count += 1
+
+    refresh_queue_positions()
+    return recovered_count
 
 
 def process_job(job: Job, *, executor=run_backend_job) -> Job:

@@ -27,6 +27,12 @@ class Command(BaseCommand):
         once = options["once"]
         idle_sleep = options["idle_sleep"]
 
+        recovered_count = services.mark_stale_running_jobs_failed()
+        if recovered_count:
+            self.stdout.write(
+                f"Recovered {recovered_count} stale running job(s) as failed."
+            )
+
         while True:
             job = services.claim_and_process_next_job()
             if job is None:
