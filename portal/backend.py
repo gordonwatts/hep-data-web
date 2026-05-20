@@ -10,9 +10,9 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from django.conf import settings
+
+import yaml
 
 from hep_data_web.settings.base import env
 

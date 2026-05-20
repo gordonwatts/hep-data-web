@@ -114,9 +114,17 @@ def test_backend_defaults_are_configurable():
 
 def test_docker_image_for_profile_prefers_profile_specific_override():
     with (
-        patch.object(backend.settings, "HEP_DATA_LLM_SERVICEX_AWKWARD_DOCKER_IMAGE", "sx/image:tag"),
+        patch.object(
+            backend.settings,
+            "HEP_DATA_LLM_SERVICEX_AWKWARD_DOCKER_IMAGE",
+            "sx/image:tag",
+        ),
         patch.object(backend.settings, "HEP_DATA_LLM_RDF_DOCKER_IMAGE", "rdf/image:tag"),
-        patch.object(backend.settings, "HEP_DATA_LLM_DOCKER_IMAGE_GLOBAL_FALLBACK", "global/image:tag"),
+        patch.object(
+            backend.settings,
+            "HEP_DATA_LLM_DOCKER_IMAGE_GLOBAL_FALLBACK",
+            "global/image:tag",
+        ),
     ):
         assert (
             backend.docker_image_for_profile(backend.BackendProfile.SERVICEX_AWKWARD)
