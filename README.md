@@ -48,7 +48,9 @@ docker compose exec web uv run python manage.py run_smoke_job
 ```
 
 If the backend image is not already available on your machine, set
-`HEP_DATA_LLM_DOCKER_IMAGE` in `.env` to the image tag you want the worker to use.
+`HEP_DATA_LLM_SERVICEX_AWKWARD_DOCKER_IMAGE` or
+`HEP_DATA_LLM_RDF_DOCKER_IMAGE` in `.env` for the profile you want the worker to use.
+The ServiceX + Awkward profile is the default for the homepage selector.
 
 When running the worker locally on your machine, it uses your normal home
 directory so `~/servicex.yaml` works as expected. The `HEP_DATA_LLM_HOME_DIR`

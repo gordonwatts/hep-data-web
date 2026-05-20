@@ -33,6 +33,30 @@ class JobServiceTests(TestCase):
         self.assertEqual(job.status, JobStatus.QUEUED)
         self.assertEqual(job.queue_position, 1)
 
+    def test_create_job_prefers_dataset_from_prompt(self):
+        services.default_dataset = lambda: "default-dataset"  # type: ignore[assignment]
+
+        job = services.create_job(
+            owner=self.user,
+            prompt="Plot ETmiss from rucio dataset prompt-dataset",
+            dataset="form-dataset",
+            backend_profile="rdf",
+        )
+
+        self.assertEqual(job.resolved_dataset, "prompt-dataset")
+
+    def test_create_job_uses_form_dataset_when_prompt_is_missing_one(self):
+        services.default_dataset = lambda: "default-dataset"  # type: ignore[assignment]
+
+        job = services.create_job(
+            owner=self.user,
+            prompt="plot the leading jet",
+            dataset="form-dataset",
+            backend_profile="rdf",
+        )
+
+        self.assertEqual(job.resolved_dataset, "form-dataset")
+
     def test_create_job_rejects_when_queue_is_full(self):
         services.default_dataset = lambda: "default-dataset"  # type: ignore[assignment]
         for index in range(20):
@@ -120,12 +144,37 @@ class ArtifactConventionTests(TestCase):
             backend_profile="rdf",
             status=JobStatus.RUNNING,
         )
-        with patch.object(services.settings, "HEP_DATA_LLM_DOCKER_IMAGE", "custom/image:tag"):
+        with patch.object(services.settings, "HEP_DATA_LLM_RDF_DOCKER_IMAGE", "custom/image:tag"):
+            with patch.object(services.settings, "HEP_DATA_LLM_MODEL", "custom-model"):
+                with patch.object(services.settings, "HEP_DATA_LLM_REPAIR_CYCLES", 4):
+                    command = services._backend_command_for_job(
+                        job, services.artifact_path_for_job(job, "result.md")
+                    )
+        assert "--docker-image" in command
+        assert "custom/image:tag" in command
+        assert "--models" in command
+        assert "custom-model" in command
+        assert "--n-iter" in command
+        assert "4" in command
+
+    def test_backend_command_omits_docker_image_when_not_configured(self):
+        user = get_user_model().objects.create_user(username="no-docker-user")
+        job = Job.objects.create(
+            owner=user,
+            original_prompt="prompt",
+            resolved_dataset="dataset",
+            backend_profile="rdf",
+            status=JobStatus.RUNNING,
+        )
+        with (
+            patch.object(services.settings, "HEP_DATA_LLM_RDF_DOCKER_IMAGE", ""),
+            patch.object(services.settings, "HEP_DATA_LLM_DOCKER_IMAGE_GLOBAL_FALLBACK", ""),
+            patch.object(services.settings, "HEP_DATA_LLM_DOCKER_IMAGE", ""),
+        ):
             command = services._backend_command_for_job(
                 job, services.artifact_path_for_job(job, "result.md")
             )
-        assert "--docker-image" in command
-        assert "custom/image:tag" in command
+        assert "--docker-image" not in command
 
     def test_run_backend_job_keeps_current_home_when_no_override_is_configured(self):
         user = get_user_model().objects.create_user(username="local-user")

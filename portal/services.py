@@ -14,8 +14,12 @@ from django.utils import timezone
 
 from portal.backend import (
     backend_config_name_for_profile,
+    backend_model_cli_value,
+    backend_repair_cycles,
+    docker_image_for_profile,
     default_dataset,
     render_job_prompt,
+    prompt_mentions_dataset,
     validate_backend_profile,
 )
 from portal.models import Job, JobStatus
@@ -91,8 +95,12 @@ def _backend_command_for_job(job: Job, output_path: Path) -> list[str]:
         str(output_path),
         "--profile",
         backend_config_name_for_profile(job.backend_profile),
+        "--models",
+        backend_model_cli_value(),
+        "--n-iter",
+        str(backend_repair_cycles()),
     ]
-    docker_image = getattr(settings, "HEP_DATA_LLM_DOCKER_IMAGE", "")
+    docker_image = docker_image_for_profile(job.backend_profile)
     if docker_image:
         command.extend(["--docker-image", docker_image])
     return command
@@ -262,7 +270,13 @@ def create_job(*, owner, prompt: str, dataset: str | None, backend_profile: str)
     if current_queue_depth >= settings.JOB_QUEUE_LIMIT:
         raise QueueFullError("System appears busy or jammed, please try again later")
 
-    resolved_dataset = dataset or default_dataset()
+    prompt_dataset = None
+    if prompt_mentions_dataset(prompt):
+        from portal.backend import _dataset_from_prompt
+
+        prompt_dataset = _dataset_from_prompt(prompt)
+
+    resolved_dataset = prompt_dataset or dataset or default_dataset()
     if not resolved_dataset:
         raise RuntimeError("No default dataset is configured")
 

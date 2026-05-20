@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 
 from portal import backend
@@ -25,6 +27,15 @@ def test_backend_config_name_matches_v1_profile():
 def test_validate_backend_profile_rejects_unknown_value():
     with pytest.raises(ValueError, match="Unsupported backend profile"):
         backend.validate_backend_profile("unknown")
+
+
+def test_prompt_mentions_dataset_detects_explicit_dataset():
+    assert backend.prompt_mentions_dataset("Plot from rucio dataset atlas.foo.bar")
+    assert backend.prompt_mentions_dataset("Use DAOD_PHYSVAL sample")
+
+
+def test_prompt_mentions_dataset_ignores_plain_prompt():
+    assert backend.prompt_mentions_dataset("Plot the leading jet pT") is False
 
 
 def test_load_example_questions_reads_yaml_from_package(monkeypatch, tmp_path):
@@ -83,5 +94,32 @@ def test_normalize_question_infers_dataset_from_prompt():
 
 def test_render_job_prompt_injects_dataset_once():
     prompt = backend.render_job_prompt("Plot ETmiss", "dataset")
-    assert prompt.endswith("Dataset to use: dataset")
+    assert prompt.endswith("If this question does not specify a dataset, use dataset.")
     assert backend.render_job_prompt(prompt, "dataset") == prompt
+
+
+def test_render_job_prompt_keeps_prompt_dataset_unchanged():
+    prompt = "Plot ETmiss from rucio dataset atlas.data.set"
+    assert backend.render_job_prompt(prompt, "fallback-dataset") == prompt
+
+
+def test_backend_defaults_are_configurable():
+    with (
+        patch.object(backend.settings, "HEP_DATA_LLM_MODEL", "custom-model"),
+        patch.object(backend.settings, "HEP_DATA_LLM_REPAIR_CYCLES", 7),
+    ):
+        assert backend.backend_model_cli_value() == "custom-model"
+        assert backend.backend_repair_cycles() == 7
+
+
+def test_docker_image_for_profile_prefers_profile_specific_override():
+    with (
+        patch.object(backend.settings, "HEP_DATA_LLM_SERVICEX_AWKWARD_DOCKER_IMAGE", "sx/image:tag"),
+        patch.object(backend.settings, "HEP_DATA_LLM_RDF_DOCKER_IMAGE", "rdf/image:tag"),
+        patch.object(backend.settings, "HEP_DATA_LLM_DOCKER_IMAGE_GLOBAL_FALLBACK", "global/image:tag"),
+    ):
+        assert (
+            backend.docker_image_for_profile(backend.BackendProfile.SERVICEX_AWKWARD)
+            == "sx/image:tag"
+        )
+        assert backend.docker_image_for_profile(backend.BackendProfile.RDF) == "rdf/image:tag"

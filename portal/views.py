@@ -189,7 +189,18 @@ def github_callback(request):
 @login_required
 def auth_status(request):
     profile = get_or_create_profile_for_user(request.user)
+    profile.refresh_from_db()
     session_approved = bool(request.session.get(SESSION_APPROVED_LOGIN_KEY))
+    if profile.approval_state == ApprovalState.APPROVED:
+        if not session_approved:
+            request.session[SESSION_APPROVED_LOGIN_KEY] = True
+            request.session.modified = True
+            return HttpResponseRedirect(reverse("home"))
+        session_approved = True
+    elif session_approved:
+        request.session[SESSION_APPROVED_LOGIN_KEY] = False
+        request.session.modified = True
+        session_approved = False
     return render(
         request,
         "portal/auth_status.html",

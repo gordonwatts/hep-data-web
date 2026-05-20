@@ -53,10 +53,16 @@ def test_dev_settings_force_debug_true():
 
 def test_base_settings_expose_docker_execution_overrides(monkeypatch):
     monkeypatch.setenv("HEP_DATA_LLM_HOME_DIR", "/tmp/home")
-    monkeypatch.setenv("HEP_DATA_LLM_DOCKER_IMAGE", "example/image:latest")
+    monkeypatch.setenv("HEP_DATA_LLM_MODEL", "gpt-4o")
+    monkeypatch.setenv("HEP_DATA_LLM_REPAIR_CYCLES", "12")
+    monkeypatch.setenv("HEP_DATA_LLM_SERVICEX_AWKWARD_DOCKER_IMAGE", "example/image:latest")
     module = importlib.reload(base)
     assert module.HEP_DATA_LLM_HOME_DIR == "/tmp/home"
-    assert module.HEP_DATA_LLM_DOCKER_IMAGE == "example/image:latest"
+    assert module.HEP_DATA_LLM_MODEL == "gpt-4o"
+    assert module.HEP_DATA_LLM_REPAIR_CYCLES == 12
+    assert module.HEP_DATA_LLM_SERVICEX_AWKWARD_DOCKER_IMAGE == "example/image:latest"
     monkeypatch.delenv("HEP_DATA_LLM_HOME_DIR", raising=False)
-    monkeypatch.delenv("HEP_DATA_LLM_DOCKER_IMAGE", raising=False)
+    monkeypatch.delenv("HEP_DATA_LLM_MODEL", raising=False)
+    monkeypatch.delenv("HEP_DATA_LLM_REPAIR_CYCLES", raising=False)
+    monkeypatch.delenv("HEP_DATA_LLM_SERVICEX_AWKWARD_DOCKER_IMAGE", raising=False)
     importlib.reload(base)

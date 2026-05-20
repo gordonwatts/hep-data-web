@@ -36,14 +36,18 @@
             <div class="alert alert-danger">
               Your account was rejected. Please contact an administrator if you think this is a mistake.
             </div>
-          {% elif profile.is_approved and not app_access_granted %}
-            <div class="alert alert-info">
-              Your account was approved, but this session still needs to be refreshed. Log out and sign in again.
+          {% elif profile.is_approved %}
+            <div class="alert alert-success">
+              Your account is approved. Continue into the application when you are ready.
             </div>
           {% endif %}
 
           <div class="d-flex flex-wrap gap-2">
-            <a class="btn btn-primary" href="{{ github_login_url }}">Sign in again with GitHub</a>
+            {% if app_access_granted %}
+              <a class="btn btn-primary" href="{% url 'home' %}">Enter the app</a>
+            {% else %}
+              <a class="btn btn-primary" href="{{ github_login_url }}">Sign in again with GitHub</a>
+            {% endif %}
             <a class="btn btn-outline-secondary" href="{{ logout_url }}">Log out</a>
           </div>
         </div>

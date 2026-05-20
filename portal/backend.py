@@ -12,6 +12,8 @@ from typing import Any
 
 import yaml
 
+from django.conf import settings
+
 from hep_data_web.settings.base import env
 
 EXAMPLE_PACKAGE_CANDIDATES = (
@@ -128,6 +130,22 @@ def _dataset_from_prompt(prompt: str) -> str | None:
     return dataset or None
 
 
+def prompt_mentions_dataset(prompt: str) -> bool:
+    if _dataset_from_prompt(prompt):
+        return True
+
+    if re.search(r"\brucio\s+dataset\b", prompt, re.IGNORECASE):
+        return True
+
+    if re.search(r"\bdaod[\w.-]*\b", prompt, re.IGNORECASE):
+        return True
+
+    if re.search(r"\bdataset\s*[:=]\s*[A-Za-z0-9][\w./:-]*", prompt, re.IGNORECASE):
+        return True
+
+    return False
+
+
 def load_example_questions() -> list[ExampleQuestion]:
     package_override = env("HEP_DATA_LLM_EXAMPLE_PACKAGE")
     packages = (package_override,) if package_override else EXAMPLE_PACKAGE_CANDIDATES
@@ -191,6 +209,40 @@ def default_dataset() -> str | None:
 def render_job_prompt(prompt: str, dataset: str | None) -> str:
     if not dataset:
         return prompt
-    if dataset in prompt:
+    if prompt_mentions_dataset(prompt):
         return prompt
-    return f"{prompt}\n\nDataset to use: {dataset}"
+    return f"{prompt}\n\nIf this question does not specify a dataset, use {dataset}."
+
+
+def backend_model_cli_value() -> str:
+    value = str(getattr(settings, "HEP_DATA_LLM_MODEL", "")).strip()
+    if not value:
+        raise ValueError("HEP_DATA_LLM_MODEL must not be empty")
+    return value
+
+
+def backend_repair_cycles() -> int:
+    raw_value = getattr(settings, "HEP_DATA_LLM_REPAIR_CYCLES", 0)
+    try:
+        cycles = int(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("HEP_DATA_LLM_REPAIR_CYCLES must be a positive integer") from exc
+    if cycles <= 0:
+        raise ValueError("HEP_DATA_LLM_REPAIR_CYCLES must be a positive integer")
+    return cycles
+
+
+def docker_image_for_profile(value: str | BackendProfile) -> str | None:
+    profile = validate_backend_profile(value)
+    if profile is BackendProfile.SERVICEX_AWKWARD:
+        image = getattr(settings, "HEP_DATA_LLM_SERVICEX_AWKWARD_DOCKER_IMAGE", "")
+    else:
+        image = getattr(settings, "HEP_DATA_LLM_RDF_DOCKER_IMAGE", "")
+
+    if not image:
+        image = getattr(settings, "HEP_DATA_LLM_DOCKER_IMAGE_GLOBAL_FALLBACK", "")
+    if not image:
+        image = getattr(settings, "HEP_DATA_LLM_DOCKER_IMAGE", "")
+
+    image = str(image).strip()
+    return image or None

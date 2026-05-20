@@ -123,7 +123,7 @@ class AuthFlowTests(TestCase):
             fetch_redirect_response=False,
         )
 
-    def test_admin_can_approve_user_and_user_needs_fresh_login(self):
+    def test_admin_can_approve_user_and_user_refreshes_into_app(self):
         target_user = get_user_model().objects.create_user(
             username="pending-user",
             email="pending@example.org",
@@ -155,15 +155,39 @@ class AuthFlowTests(TestCase):
 
         self.assertFalse(self.client.session[SESSION_APPROVED_LOGIN_KEY])
 
+        refresh_response = self.client.get(reverse("auth-status"))
+        self.assertRedirects(
+            refresh_response,
+            reverse("home"),
+            fetch_redirect_response=False,
+        )
+        self.assertTrue(self.client.session[SESSION_APPROVED_LOGIN_KEY])
+
+        allowed_response = self.client.get(reverse("home"))
+        self.assertEqual(allowed_response.status_code, 200)
+        self.assertContains(allowed_response, "Ask for a plot in plain language")
+
+    def test_rejected_user_refresh_stays_blocked(self):
+        target_user = get_user_model().objects.create_user(
+            username="rejected-user",
+            email="rejected@example.org",
+            password="secret",
+        )
+        profile = get_or_create_profile_for_user(target_user)
+        profile.approval_state = ApprovalState.REJECTED
+        profile.save(update_fields=["approval_state"])
+        self.client.force_login(target_user)
+        session = self.client.session
+        session[SESSION_APPROVED_LOGIN_KEY] = False
+        session.save()
+
+        response = self.client.get(reverse("auth-status"))
+
+        self.assertContains(response, "Your account was rejected")
+        self.assertFalse(self.client.session[SESSION_APPROVED_LOGIN_KEY])
         blocked_response = self.client.get(reverse("home"))
         self.assertRedirects(
             blocked_response,
             reverse("auth-status"),
             fetch_redirect_response=False,
         )
-
-        self.client.logout()
-        self._force_approved_login(target_user)
-        allowed_response = self.client.get(reverse("home"))
-        self.assertEqual(allowed_response.status_code, 200)
-        self.assertContains(allowed_response, "Ask for a plot in plain language")

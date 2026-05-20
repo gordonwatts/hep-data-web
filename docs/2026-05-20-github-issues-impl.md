@@ -87,98 +87,98 @@ This plan keeps the existing architecture. Do not execute analysis work from HTT
 
 ### 1. User Approval Refresh (Issue #11)
 
-- [ ] Update `portal.auth.profile_has_app_access` or the `auth_status` view so persisted `APPROVED` state can refresh the session approval flag without a new OAuth login.
+- [x] Update `portal.auth.profile_has_app_access` or the `auth_status` view so persisted `APPROVED` state can refresh the session approval flag without a new OAuth login.
   - Current behavior requires both `profile.approval_state == APPROVED` and `SESSION_APPROVED_LOGIN_KEY == True`.
   - Preferred minimal change: in `portal.views.auth_status`, call `profile.refresh_from_db()`, and if `profile.approval_state == ApprovalState.APPROVED`, set `SESSION_APPROVED_LOGIN_KEY = True` and redirect to `home` or render an approved state with a primary link into the app.
   - Keep rejected users blocked and do not set the session flag for rejected profiles.
-- [ ] Update `templates/portal/auth_status.html`.
+- [x] Update `templates/portal/auth_status.html`.
   - Remove the message that says approved users must log out and sign in again.
   - For approved users, show a clear primary action to enter the app if the view does not redirect immediately.
   - Keep pending and rejected copy explicit.
-- [ ] Update `portal.middleware.ApprovalGateMiddleware` only if needed.
+- [x] Update `portal.middleware.ApprovalGateMiddleware` only if needed.
   - The middleware currently calls `profile_has_app_access`, so approval refresh should be handled before the user tries protected pages or by making the helper trust persisted approval.
   - If changing the helper to trust persisted approval, verify this does not weaken login semantics. The user is already authenticated, so this is acceptable.
-- [ ] Replace `tests/test_auth.py::test_admin_can_approve_user_and_user_needs_fresh_login`.
+- [x] Replace `tests/test_auth.py::test_admin_can_approve_user_and_user_needs_fresh_login`.
   - New expectation: pending user is approved by admin, refreshes `/accounts/status/`, and can reach `/` without logout.
-- [ ] Add rejected refresh regression test in `tests/test_auth.py`.
+- [x] Add rejected refresh regression test in `tests/test_auth.py`.
   - Force-login a rejected user with `SESSION_APPROVED_LOGIN_KEY = False`.
   - GET `/accounts/status/`.
   - Assert rejected copy is shown and GET `/` still redirects to `auth-status`.
 
 ### 2. Dataset Selection Semantics (Issue #8)
 
-- [ ] Replace `portal.backend.render_job_prompt(prompt, dataset)` semantics.
+- [x] Replace `portal.backend.render_job_prompt(prompt, dataset)` semantics.
   - Current implementation appends `Dataset to use: <dataset>` if the dataset string is not a substring of the prompt.
   - Required implementation should append conditional fallback text: `If this question does not specify a dataset, use <dataset>.`
   - Keep the exact helper in `portal.backend`; do not move dataset logic into views or worker code.
-- [ ] Add a small prompt-dataset detector helper in `portal.backend`.
+- [x] Add a small prompt-dataset detector helper in `portal.backend`.
   - Reuse `_dataset_from_prompt` as one detector, but broaden enough for supported tests.
   - Suggested helper: `prompt_mentions_dataset(prompt: str) -> bool`.
   - It can return true for `rucio dataset`, `dataset`, `DAOD`, or explicit known dataset-like strings. Keep it conservative and documented in tests.
-- [ ] Update `portal.services.create_job`.
+- [x] Update `portal.services.create_job`.
   - Preserve `Job.resolved_dataset` as:
     - Prompt-specified dataset if confidently extracted.
     - Form dataset if no prompt dataset.
     - Default dataset if neither prompt nor form dataset.
   - Do not reject submission only because the form dataset is blank.
   - Continue raising if there is no prompt dataset, no form dataset, and no configured default dataset.
-- [ ] Update `_backend_command_for_job`.
+- [x] Update `_backend_command_for_job`.
   - The prompt sent to backend should include conditional fallback only when using form/default dataset.
   - If prompt specifies a dataset, pass original prompt unchanged.
-- [ ] Consider adding one optional field only if necessary.
+- [x] Consider adding one optional field only if necessary.
   - Prefer no migration if the existing `resolved_dataset` can represent the selected fallback or extracted prompt dataset.
   - If tests prove the distinction is ambiguous, add `Job.result_metadata["dataset_source"]` at job creation instead of a new model field.
-- [ ] Update `tests/test_backend.py`.
+- [x] Update `tests/test_backend.py`.
   - Prompt-specified dataset results in unchanged prompt.
   - Form fallback appends conditional instruction.
   - Default fallback appends conditional instruction.
-- [ ] Update `tests/test_jobs.py` or `tests/test_portal_flow.py`.
+- [x] Update `tests/test_jobs.py` or `tests/test_portal_flow.py`.
   - `create_job` with prompt dataset and blank form does not use default.
   - `create_job` with form dataset stores that dataset and backend prompt remains conditional.
   - `create_job` with neither uses default dataset.
 
 ### 3. Backend Runtime Defaults (Issue #6)
 
-- [ ] Add settings in `hep_data_web/settings/base.py`.
+- [x] Add settings in `hep_data_web/settings/base.py`.
   - `HEP_DATA_LLM_MODEL = env("HEP_DATA_LLM_MODEL", "gpt-54-mini")`
   - `HEP_DATA_LLM_REPAIR_CYCLES = int(env("HEP_DATA_LLM_REPAIR_CYCLES", "10"))`
   - If the backend CLI names the option differently after inspection, use the actual CLI flags in the command helper.
-- [ ] Add adapter helpers in `portal.backend`.
+- [x] Add adapter helpers in `portal.backend`.
   - `backend_model_cli_value() -> str`
   - `backend_repair_cycles() -> int`
   - Keep validation simple: model non-empty; repair cycles positive integer.
-- [ ] Update `portal.services._backend_command_for_job`.
+- [x] Update `portal.services._backend_command_for_job`.
   - Add model flag with value from settings.
   - Add repair/retry/cycles flag with value from settings.
   - Confirm flag names against `hep-data-llm` before implementation. If unknown, inspect the installed CLI with `uv run python -m hep_data_llm.cli plot --help`.
-- [ ] Update `.env.example`.
+- [x] Update `.env.example`.
   - Document `HEP_DATA_LLM_MODEL=gpt-54-mini`.
   - Document `HEP_DATA_LLM_REPAIR_CYCLES=10`.
-- [ ] Update `tests/test_settings.py`.
+- [x] Update `tests/test_settings.py`.
   - Verify settings expose defaults and env overrides.
-- [ ] Update `tests/test_jobs.py`.
+- [x] Update `tests/test_jobs.py`.
   - `_backend_command_for_job` contains the configured model and repair cycle options.
 
 ### 4. Per-profile Docker Image Configuration (Issue #10)
 
-- [ ] Replace global-only image selection in `portal.services._backend_command_for_job`.
+- [x] Replace global-only image selection in `portal.services._backend_command_for_job`.
   - Current code reads `settings.HEP_DATA_LLM_DOCKER_IMAGE`.
   - Move selection into `portal.backend.docker_image_for_profile(profile)`.
-- [ ] Add settings in `hep_data_web/settings/base.py`.
+- [x] Add settings in `hep_data_web/settings/base.py`.
   - `HEP_DATA_LLM_SERVICEX_AWKWARD_DOCKER_IMAGE`
   - `HEP_DATA_LLM_RDF_DOCKER_IMAGE`
   - `HEP_DATA_LLM_DOCKER_IMAGE_GLOBAL_FALLBACK` if keeping legacy global override.
   - Consider leaving `HEP_DATA_LLM_DOCKER_IMAGE` as a backwards-compatible alias, but document that it is global fallback only.
-- [ ] Add tests in `tests/test_backend.py`.
+- [x] Add tests in `tests/test_backend.py`.
   - ServiceX + Awkward profile returns only ServiceX image override.
   - RDF profile returns only RDF image override.
   - No override returns empty string or `None`, so no `--docker-image` flag is passed.
   - Legacy global fallback applies only when explicitly configured and no profile-specific override exists.
-- [ ] Update `tests/test_jobs.py`.
+- [x] Update `tests/test_jobs.py`.
   - Backend command includes RDF image when job profile is `rdf`.
   - Backend command includes ServiceX image when profile is `servicex_awkward`.
   - Backend command omits `--docker-image` when selected profile has no override.
-- [ ] Update `.env.example`, `README.md`, and `docker-compose.yml`.
+- [x] Update `.env.example`, `README.md`, and `docker-compose.yml`.
   - Remove or de-emphasize global `HEP_DATA_LLM_DOCKER_IMAGE`.
   - Add profile-specific variables to both web and worker environments.
 
