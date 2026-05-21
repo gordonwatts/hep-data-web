@@ -10,6 +10,9 @@ param(
   [string]$ImageName = "",
   [string]$ImageTag = "",
   [string]$ContainerAppsEnvironmentName,
+  [string]$ContainerAppsLogsDestination = "",
+  [string]$ContainerAppsLogsWorkspaceId = "",
+  [string]$ContainerAppsLogsWorkspaceKey = "",
   [string]$WebAppName,
   [string]$WorkerAppName,
   [string]$StorageAccountName,
@@ -29,7 +32,7 @@ param(
   [string]$GithubOrg = "",
   [string]$GithubAdminUsers = "",
   [string]$AdminEmails = "",
-  [string]$ServiceXToken = "",
+  [string]$ServiceXConfigPath = "",
   [string]$OpenAiApiKey = "",
   [string]$ServiceXAwkwardDockerImage = "",
   [string]$RdfDockerImage = "",
@@ -44,6 +47,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue) {
+  $PSNativeCommandUseErrorActionPreference = $false
+}
 
 function Invoke-Az {
   param(
@@ -53,8 +59,112 @@ function Invoke-Az {
 
   & az @Arguments
   if ($LASTEXITCODE -ne 0) {
-    throw "Azure CLI command failed: az $($Arguments -join ' ')"
+    throw "Azure CLI command failed."
   }
+}
+
+function Ensure-ResourceProviderRegistered {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Namespace
+  )
+
+  $registrationState = (& az provider show --namespace $Namespace --query registrationState -o tsv)
+  if ($LASTEXITCODE -ne 0) {
+    throw "Unable to check Azure resource provider registration for '$Namespace'."
+  }
+
+  if ($registrationState -eq "Registered") {
+    return
+  }
+
+  Write-Host "Registering Azure resource provider '$Namespace' for this subscription..."
+  Invoke-Az -Arguments @("provider", "register", "--namespace", $Namespace, "--wait", "--only-show-errors", "--output", "none")
+}
+
+function Ensure-PostgresServerReady {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ResourceGroup,
+    [Parameter(Mandatory = $true)]
+    [string]$ServerName
+  )
+
+  $serverState = (& az postgres flexible-server show --resource-group $ResourceGroup --name $ServerName --query state -o tsv)
+  if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($serverState)) {
+    return $false
+  }
+
+  if ($serverState -eq "Stopped") {
+    Write-Host "Starting existing PostgreSQL server '$ServerName'..."
+    Invoke-Az -Arguments @("postgres", "flexible-server", "start", "--resource-group", $ResourceGroup, "--name", $ServerName)
+  }
+  return $true
+}
+
+function Ensure-PostgresDatabase {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ResourceGroup,
+    [Parameter(Mandatory = $true)]
+    [string]$ServerName,
+    [Parameter(Mandatory = $true)]
+    [string]$DatabaseName
+  )
+
+  $existingDatabases = (& az postgres flexible-server db list --resource-group $ResourceGroup --server-name $ServerName --query "[].name" -o tsv)
+  if ($LASTEXITCODE -ne 0) {
+    throw "Unable to list PostgreSQL databases for server '$ServerName'."
+  }
+
+  foreach ($existingDatabase in @($existingDatabases)) {
+    if ($existingDatabase -eq $DatabaseName) {
+      return
+    }
+  }
+
+  Invoke-Az -Arguments @(
+    "postgres", "flexible-server", "db", "create",
+    "--resource-group", $ResourceGroup,
+    "--server-name", $ServerName,
+    "--name", $DatabaseName,
+    "--only-show-errors",
+    "--output", "none"
+  )
+}
+
+function Ensure-PostgresComputeSku {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ResourceGroup,
+    [Parameter(Mandatory = $true)]
+    [string]$ServerName,
+    [Parameter(Mandatory = $true)]
+    [string]$SkuName,
+    [Parameter(Mandatory = $true)]
+    [string]$Tier
+  )
+
+  $serverInfoJson = (& az postgres flexible-server show --resource-group $ResourceGroup --name $ServerName --query "{sku:sku.name,tier:sku.tier}" -o json)
+  if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($serverInfoJson)) {
+    throw "Unable to inspect PostgreSQL server '$ServerName'."
+  }
+
+  $serverInfo = $serverInfoJson | ConvertFrom-Json
+  if ($serverInfo.sku -eq $SkuName -and $serverInfo.tier -eq $Tier) {
+    return
+  }
+
+  Write-Host "Updating PostgreSQL server '$ServerName' to compute SKU '$SkuName' in tier '$Tier'..."
+  Invoke-Az -Arguments @(
+    "postgres", "flexible-server", "update",
+    "--resource-group", $ResourceGroup,
+    "--name", $ServerName,
+    "--sku-name", $SkuName,
+    "--tier", $Tier,
+    "--only-show-errors",
+    "--output", "none"
+  )
 }
 
 function Get-SanitizedName {
@@ -169,6 +279,25 @@ function Require-ConfigValue {
   return $Value
 }
 
+function Resolve-RelativePath {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$PathValue,
+    [Parameter(Mandatory = $true)]
+    [string]$BaseDirectory
+  )
+
+  if ([string]::IsNullOrWhiteSpace($PathValue)) {
+    return $PathValue
+  }
+
+  if ([System.IO.Path]::IsPathRooted($PathValue)) {
+    return $PathValue
+  }
+
+  return [System.IO.Path]::GetFullPath((Join-Path $BaseDirectory $PathValue))
+}
+
 function Get-SecretText {
   param(
     [Parameter(Mandatory = $true)]
@@ -231,6 +360,8 @@ function New-ContainerAppYaml {
     [string]$ContainerName,
     [Parameter(Mandatory = $true)]
     [string[]]$Command,
+    [string]$RegistryUsername = "",
+    [string]$RegistryPassword = "",
     [string]$GithubClientSecret = "",
     [string]$CertificatePassword = "",
     [string]$AllowedHosts = "*",
@@ -239,7 +370,8 @@ function New-ContainerAppYaml {
     [string]$GithubOrg = "",
     [string]$GithubAdminUsers = "",
     [string]$AdminEmails = "",
-    [string]$ServiceXToken = "",
+    [string]$ServiceXConfigText = "",
+    [string]$ServiceXHomeDir = "",
     [string]$OpenAiApiKey = "",
     [string]$ServiceXAwkwardDockerImage = "",
     [string]$RdfDockerImage = "",
@@ -269,19 +401,31 @@ function New-ContainerAppYaml {
   }
   $yaml += "    registries:"
   $yaml += "      - server: $RegistryServer"
-  $yaml += "        identity: system"
+  if (-not [string]::IsNullOrWhiteSpace($RegistryUsername) -and -not [string]::IsNullOrWhiteSpace($RegistryPassword)) {
+    $yaml += "        username: $RegistryUsername"
+    $yaml += "        passwordSecretRef: acr-password"
+  } else {
+    $yaml += "        identity: system"
+  }
   $yaml += "    secrets:"
   $yaml += "      - name: django-secret-key"
   $yaml += "        value: $(Escape-YamlScalar $SecretKey)"
   $yaml += "      - name: database-url"
   $yaml += "        value: $(Escape-YamlScalar $DatabaseUrl)"
+  if (-not [string]::IsNullOrWhiteSpace($RegistryUsername) -and -not [string]::IsNullOrWhiteSpace($RegistryPassword)) {
+    $yaml += "      - name: acr-password"
+    $yaml += "        value: $(Escape-YamlScalar $RegistryPassword)"
+  }
   if (-not [string]::IsNullOrWhiteSpace($GithubClientSecret)) {
     $yaml += "      - name: github-client-secret"
     $yaml += "        value: $(Escape-YamlScalar $GithubClientSecret)"
   }
-  if (-not [string]::IsNullOrWhiteSpace($ServiceXToken)) {
-    $yaml += "      - name: servicex-token"
-    $yaml += "        value: $(Escape-YamlScalar $ServiceXToken)"
+  if (-not [string]::IsNullOrWhiteSpace($ServiceXConfigText)) {
+    $yaml += "      - name: servicex-config-yaml"
+    $yaml += "        value: |"
+    foreach ($line in ($ServiceXConfigText -replace "`r`n", "`n" -replace "`r", "`n").Split("`n")) {
+      $yaml += "          $line"
+    }
   }
   if (-not [string]::IsNullOrWhiteSpace($OpenAiApiKey)) {
     $yaml += "      - name: openai-api-key"
@@ -299,6 +443,13 @@ function New-ContainerAppYaml {
   $yaml += "      - name: media"
   $yaml += "        storageType: AzureFile"
   $yaml += "        storageName: mediafiles"
+  if (-not [string]::IsNullOrWhiteSpace($ServiceXConfigText)) {
+    $yaml += "      - name: servicex-config"
+    $yaml += "        storageType: Secret"
+    $yaml += "        secrets:"
+    $yaml += "          - secretRef: servicex-config-yaml"
+    $yaml += "            path: servicex.yaml"
+  }
   $yaml += "    containers:"
   $yaml += "      - name: $ContainerName"
   $yaml += "        image: $ImageRef"
@@ -311,6 +462,10 @@ function New-ContainerAppYaml {
   $yaml += "        env:"
   $yaml += "          - name: DJANGO_SETTINGS_MODULE"
   $yaml += "            value: hep_data_web.settings.prod"
+  if (-not [string]::IsNullOrWhiteSpace($ServiceXConfigText)) {
+    $yaml += "          - name: HEP_DATA_LLM_HOME_DIR"
+    $yaml += "            value: $(Escape-YamlScalar $ServiceXHomeDir)"
+  }
   $yaml += "          - name: SECRET_KEY"
   $yaml += "            secretRef: django-secret-key"
   $yaml += "          - name: DATABASE_URL"
@@ -329,12 +484,8 @@ function New-ContainerAppYaml {
     $yaml += "          - name: GITHUB_CLIENT_SECRET"
     $yaml += "            secretRef: github-client-secret"
   }
-  if (-not [string]::IsNullOrWhiteSpace($ServiceXToken)) {
-    $yaml += "          - name: SERVICEX_TOKEN"
-    $yaml += "            secretRef: servicex-token"
-  }
   if (-not [string]::IsNullOrWhiteSpace($OpenAiApiKey)) {
-    $yaml += "          - name: OPENAI_API_KEY"
+    $yaml += "          - name: api_openai_com_API_KEY"
     $yaml += "            secretRef: openai-api-key"
   }
   if (-not [string]::IsNullOrWhiteSpace($GithubOrg)) {
@@ -382,6 +533,10 @@ function New-ContainerAppYaml {
   $yaml += "        volumeMounts:"
   $yaml += "          - volumeName: media"
   $yaml += "            mountPath: /app/media"
+  if (-not [string]::IsNullOrWhiteSpace($ServiceXConfigText)) {
+    $yaml += "          - volumeName: servicex-config"
+    $yaml += "            mountPath: $(Escape-YamlScalar $ServiceXHomeDir)"
+  }
   return $yaml -join [Environment]::NewLine
 }
 
@@ -393,6 +548,9 @@ $ContainerRegistryName = Require-ConfigValue (Get-ConfigValue -ExplicitValue $Co
 $ImageName = Require-ConfigValue (Get-ConfigValue -ExplicitValue $ImageName -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "AZURE_IMAGE_NAME") "AZURE_IMAGE_NAME"
 $ImageTag = Get-ConfigValue -ExplicitValue $ImageTag -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "AZURE_IMAGE_TAG" -DefaultValue "latest"
 $ContainerAppsEnvironmentName = Get-ConfigValue -ExplicitValue $ContainerAppsEnvironmentName -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "AZURE_CONTAINER_APPS_ENVIRONMENT_NAME"
+$ContainerAppsLogsDestination = Get-ConfigValue -ExplicitValue $ContainerAppsLogsDestination -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "AZURE_CONTAINER_APPS_LOGS_DESTINATION" -DefaultValue "none"
+$ContainerAppsLogsWorkspaceId = Get-ConfigValue -ExplicitValue $ContainerAppsLogsWorkspaceId -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "AZURE_CONTAINER_APPS_LOGS_WORKSPACE_ID"
+$ContainerAppsLogsWorkspaceKey = Get-ConfigValue -ExplicitValue $ContainerAppsLogsWorkspaceKey -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "AZURE_CONTAINER_APPS_LOGS_WORKSPACE_KEY"
 $WebAppName = Get-ConfigValue -ExplicitValue $WebAppName -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "AZURE_WEB_APP_NAME"
 $WorkerAppName = Get-ConfigValue -ExplicitValue $WorkerAppName -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "AZURE_WORKER_APP_NAME"
 $StorageAccountName = Get-ConfigValue -ExplicitValue $StorageAccountName -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "AZURE_STORAGE_ACCOUNT_NAME"
@@ -412,11 +570,12 @@ $GithubClientId = Get-ConfigValue -ExplicitValue $GithubClientId -ConfigValues $
 $GithubOrg = Get-ConfigValue -ExplicitValue $GithubOrg -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "GITHUB_ORG"
 $GithubAdminUsers = Get-ConfigValue -ExplicitValue $GithubAdminUsers -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "GITHUB_ADMIN_USERS"
 $AdminEmails = Get-ConfigValue -ExplicitValue $AdminEmails -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "ADMIN_EMAILS"
-$ServiceXToken = Get-ConfigValue -ExplicitValue $ServiceXToken -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "SERVICEX_TOKEN"
+$ServiceXConfigPath = Get-ConfigValue -ExplicitValue $ServiceXConfigPath -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "SERVICEX_CONFIG_PATH"
 $OpenAiApiKey = Get-ConfigValue -ExplicitValue $OpenAiApiKey -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "OPENAI_API_KEY"
 $ServiceXAwkwardDockerImage = Get-ConfigValue -ExplicitValue $ServiceXAwkwardDockerImage -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "HEP_DATA_LLM_SERVICEX_AWKWARD_DOCKER_IMAGE"
 $RdfDockerImage = Get-ConfigValue -ExplicitValue $RdfDockerImage -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "HEP_DATA_LLM_RDF_DOCKER_IMAGE"
 $DockerImageGlobalFallback = Get-ConfigValue -ExplicitValue $DockerImageGlobalFallback -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "HEP_DATA_LLM_DOCKER_IMAGE_GLOBAL_FALLBACK"
+$ServiceXHomeDir = Get-ConfigValue -ExplicitValue "" -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "HEP_DATA_LLM_HOME_DIR" -DefaultValue "/home/site"
 $JobQueueLimit = Get-ConfigValue -ExplicitValue $JobQueueLimit -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "JOB_QUEUE_LIMIT" -DefaultValue "20"
 $JobPollIntervalSeconds = Get-ConfigValue -ExplicitValue $JobPollIntervalSeconds -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "JOB_POLL_INTERVAL_SECONDS" -DefaultValue "1"
 $JobSoftTimeoutSeconds = Get-ConfigValue -ExplicitValue $JobSoftTimeoutSeconds -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "JOB_SOFT_TIMEOUT_SECONDS" -DefaultValue "1800"
@@ -440,9 +599,22 @@ if ([string]::IsNullOrWhiteSpace($PostgresServerName)) {
   $PostgresServerName = Get-SanitizedName -Value "$AppNamePrefix-pg" -MaxLength 63 -AllowHyphen
 }
 
+$ServiceXConfigText = ""
+if (-not [string]::IsNullOrWhiteSpace($ServiceXConfigPath)) {
+  $ServiceXConfigPath = Resolve-RelativePath -PathValue $ServiceXConfigPath -BaseDirectory (Split-Path -Parent ([System.IO.Path]::GetFullPath($ConfigPath)))
+  if (-not (Test-Path -LiteralPath $ServiceXConfigPath)) {
+    throw "ServiceX config file not found: $ServiceXConfigPath"
+  }
+  $ServiceXConfigText = Get-Content -LiteralPath $ServiceXConfigPath -Raw -Encoding utf8
+}
+
 $postgresAdminPassword = Get-SecretText -EnvironmentVariable "AZURE_POSTGRES_ADMIN_PASSWORD" -Prompt "Azure PostgreSQL admin password" -ConfigValues $userConfig -DefaultValues $defaultConfig
 $djangoSecretKey = Get-SecretText -EnvironmentVariable "AZURE_DJANGO_SECRET_KEY" -Prompt "Django SECRET_KEY" -ConfigValues $userConfig -DefaultValues $defaultConfig
-$githubClientSecret = Get-SecretText -EnvironmentVariable "AZURE_GITHUB_CLIENT_SECRET" -Prompt "GitHub OAuth client secret" -ConfigValues $userConfig -DefaultValues $defaultConfig
+$githubClientSecret = ""
+$githubClientSecretCandidate = Get-ConfigValue -ExplicitValue "" -ConfigValues $userConfig -DefaultValues $defaultConfig -EnvironmentVariable "AZURE_GITHUB_CLIENT_SECRET"
+if (-not [string]::IsNullOrWhiteSpace($GithubClientId) -or -not [string]::IsNullOrWhiteSpace($githubClientSecretCandidate)) {
+  $githubClientSecret = Get-SecretText -EnvironmentVariable "AZURE_GITHUB_CLIENT_SECRET" -Prompt "GitHub OAuth client secret" -ConfigValues $userConfig -DefaultValues $defaultConfig
+}
 $certificatePasswordValue = $CertificatePassword
 if (-not [string]::IsNullOrWhiteSpace($CertificatePath)) {
   if (-not (Test-Path -LiteralPath $CertificatePath)) {
@@ -457,7 +629,10 @@ Write-Host "Creating or updating Azure resources in resource group '$ResourceGro
 if (-not [string]::IsNullOrWhiteSpace($Subscription)) {
   Invoke-Az -Arguments @("account", "set", "--subscription", $Subscription, "--output", "none")
 }
-Invoke-Az -Arguments @("group", "create", "--name", $ResourceGroup, "--location", $Location, "--output", "none")
+Invoke-Az -Arguments @("group", "create", "--name", $ResourceGroup, "--location", $Location, "--only-show-errors", "--output", "none")
+Ensure-ResourceProviderRegistered -Namespace "Microsoft.DBforPostgreSQL"
+Ensure-ResourceProviderRegistered -Namespace "Microsoft.App"
+Ensure-ResourceProviderRegistered -Namespace "Microsoft.OperationalInsights"
 
 $acrLoginServer = $null
 Invoke-Az -Arguments @(
@@ -466,15 +641,30 @@ Invoke-Az -Arguments @(
   "--name", $ContainerRegistryName,
   "--sku", "Standard",
   "--location", $Location,
-  "--admin-enabled", "false",
+  "--admin-enabled", "true",
+  "--only-show-errors",
   "--output", "none"
 )
+Invoke-Az -Arguments @(
+  "acr", "update",
+  "--resource-group", $ResourceGroup,
+  "--name", $ContainerRegistryName,
+  "--admin-enabled", "true",
+  "--only-show-errors",
+  "--output", "none"
+)
+$acrAdminCredentials = (& az acr credential show --resource-group $ResourceGroup --name $ContainerRegistryName --query "{username:username,password:passwords[0].value}" -o json)
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($acrAdminCredentials)) {
+  throw "Unable to determine Azure Container Registry admin credentials."
+}
+$acrAdminCredentialsObject = $acrAdminCredentials | ConvertFrom-Json
 $acrImportArgs = @(
   "acr", "import",
   "--name", $ContainerRegistryName,
   "--source", $dockerHubSourceImage,
   "--image", "$ImageName`:$ImageTag",
   "--force",
+  "--only-show-errors",
   "--output", "none"
 )
 if (-not [string]::IsNullOrWhiteSpace($dockerHubUsername) -and -not [string]::IsNullOrWhiteSpace($dockerHubPassword)) {
@@ -494,6 +684,7 @@ Invoke-Az -Arguments @(
   "--sku", "Standard_LRS",
   "--kind", "StorageV2",
   "--allow-blob-public-access", "false",
+  "--only-show-errors",
   "--output", "none"
 )
 
@@ -507,39 +698,70 @@ Invoke-Az -Arguments @(
   "--name", $StorageShareName,
   "--account-name", $StorageAccountName,
   "--account-key", $storageAccountKey,
+  "--only-show-errors",
   "--output", "none"
 )
 
-Invoke-Az -Arguments @(
-  "postgres", "flexible-server", "create",
-  "--resource-group", $ResourceGroup,
-  "--name", $PostgresServerName,
-  "--location", $Location,
-  "--admin-user", $PostgresAdminUser,
-  "--admin-password", $postgresAdminPassword,
-  "--version", "16",
-  "--tier", "Burstable",
-  "--sku-name", "Standard_B1ms",
-  "--storage-size", "32",
-  "--public-access", "0.0.0.0",
-  "--output", "none"
-)
+$postgresServerExists = Ensure-PostgresServerReady -ResourceGroup $ResourceGroup -ServerName $PostgresServerName
+if (-not $postgresServerExists) {
+  Invoke-Az -Arguments @(
+    "postgres", "flexible-server", "create",
+    "--resource-group", $ResourceGroup,
+    "--name", $PostgresServerName,
+    "--location", $Location,
+    "--admin-user", $PostgresAdminUser,
+    "--admin-password", $postgresAdminPassword,
+    "--version", "16",
+    "--tier", "Burstable",
+    "--sku-name", "Standard_B1ms",
+    "--storage-size", "32",
+    "--public-access", "0.0.0.0",
+    "--only-show-errors",
+    "--output", "none"
+  )
+}
 
-Invoke-Az -Arguments @(
-  "postgres", "flexible-server", "db", "create",
-  "--resource-group", $ResourceGroup,
-  "--server-name", $PostgresServerName,
-  "--database-name", $PostgresDatabaseName,
-  "--output", "none"
-)
+Ensure-PostgresComputeSku -ResourceGroup $ResourceGroup -ServerName $PostgresServerName -SkuName "Standard_B1ms" -Tier "Burstable"
 
-Invoke-Az -Arguments @(
-  "containerapp", "env", "create",
-  "--name", $ContainerAppsEnvironmentName,
-  "--resource-group", $ResourceGroup,
-  "--location", $Location,
-  "--output", "none"
-)
+Ensure-PostgresDatabase -ResourceGroup $ResourceGroup -ServerName $PostgresServerName -DatabaseName $PostgresDatabaseName
+
+ $containerAppEnvCreateOutput = & az containerapp env create `
+  --name $ContainerAppsEnvironmentName `
+  --resource-group $ResourceGroup `
+  --location $Location `
+  --logs-destination $ContainerAppsLogsDestination `
+  --only-show-errors `
+  --output none 2>&1
+if ($LASTEXITCODE -ne 0) {
+  throw "Azure CLI command failed."
+}
+if ($ContainerAppsLogsDestination -eq "none") {
+  $containerAppEnvCreateText = $containerAppEnvCreateOutput -join [Environment]::NewLine
+  if ($containerAppEnvCreateText -match 'Generating a Log Analytics workspace with name "([^"]+)"') {
+    $generatedWorkspaceName = $Matches[1]
+    Write-Host "Removing auto-generated Log Analytics workspace '$generatedWorkspaceName'..."
+    Invoke-Az -Arguments @(
+      "monitor", "log-analytics", "workspace", "delete",
+      "--resource-group", $ResourceGroup,
+      "--workspace-name", $generatedWorkspaceName,
+      "--force",
+      "--yes",
+      "--only-show-errors",
+      "--output", "none"
+    )
+  }
+}
+if (-not [string]::IsNullOrWhiteSpace($ContainerAppsLogsWorkspaceId) -and -not [string]::IsNullOrWhiteSpace($ContainerAppsLogsWorkspaceKey)) {
+  Invoke-Az -Arguments @(
+    "containerapp", "env", "update",
+    "--name", $ContainerAppsEnvironmentName,
+    "--resource-group", $ResourceGroup,
+    "--logs-destination", "log-analytics",
+    "--logs-workspace-id", $ContainerAppsLogsWorkspaceId,
+    "--logs-workspace-key", $ContainerAppsLogsWorkspaceKey,
+    "--output", "none"
+  )
+}
 
 Invoke-Az -Arguments @(
   "containerapp", "env", "storage", "set",
@@ -555,7 +777,7 @@ Invoke-Az -Arguments @(
 )
 
 $postgresHost = "$PostgresServerName.postgres.database.azure.com"
-$databaseUrl = "postgresql://$($PostgresAdminUser):$postgresAdminPassword@$postgresHost:5432/$PostgresDatabaseName?sslmode=require"
+$databaseUrl = "postgresql://$($PostgresAdminUser):$postgresAdminPassword@$postgresHost:5432/${PostgresDatabaseName}?sslmode=require"
 $environmentId = (& az containerapp env show --name $ContainerAppsEnvironmentName --resource-group $ResourceGroup --query id -o tsv)
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($environmentId)) {
   throw "Unable to determine the Container Apps environment ID."
@@ -567,6 +789,8 @@ $webYaml = New-ContainerAppYaml `
   -ImageRef $imageRef `
   -EnvironmentId $environmentId `
   -RegistryServer $acrLoginServer `
+  -RegistryUsername $acrAdminCredentialsObject.username `
+  -RegistryPassword $acrAdminCredentialsObject.password `
   -DatabaseUrl $databaseUrl `
   -SecretKey $djangoSecretKey `
   -ContainerName "web" `
@@ -577,7 +801,8 @@ $webYaml = New-ContainerAppYaml `
   -GithubOrg $GithubOrg `
   -GithubAdminUsers $GithubAdminUsers `
   -AdminEmails $AdminEmails `
-  -ServiceXToken $ServiceXToken `
+  -ServiceXConfigText $ServiceXConfigText `
+  -ServiceXHomeDir $ServiceXHomeDir `
   -OpenAiApiKey $OpenAiApiKey `
   -ServiceXAwkwardDockerImage $ServiceXAwkwardDockerImage `
   -RdfDockerImage $RdfDockerImage `
@@ -588,6 +813,7 @@ $webYaml = New-ContainerAppYaml `
   -JobHardTimeoutSeconds $JobHardTimeoutSeconds `
   -BackendModel $BackendModel `
   -BackendRepairCycles $BackendRepairCycles `
+  -Command @("uv", "run", "gunicorn", "hep_data_web.wsgi:application", "--bind", "0.0.0.0:8000") `
   -IncludeIngress
 
 $workerYaml = New-ContainerAppYaml `
@@ -595,6 +821,8 @@ $workerYaml = New-ContainerAppYaml `
   -ImageRef $imageRef `
   -EnvironmentId $environmentId `
   -RegistryServer $acrLoginServer `
+  -RegistryUsername $acrAdminCredentialsObject.username `
+  -RegistryPassword $acrAdminCredentialsObject.password `
   -DatabaseUrl $databaseUrl `
   -SecretKey $djangoSecretKey `
   -ContainerName "worker" `
@@ -605,7 +833,8 @@ $workerYaml = New-ContainerAppYaml `
   -GithubOrg $GithubOrg `
   -GithubAdminUsers $GithubAdminUsers `
   -AdminEmails $AdminEmails `
-  -ServiceXToken $ServiceXToken `
+  -ServiceXConfigText $ServiceXConfigText `
+  -ServiceXHomeDir $ServiceXHomeDir `
   -OpenAiApiKey $OpenAiApiKey `
   -ServiceXAwkwardDockerImage $ServiceXAwkwardDockerImage `
   -RdfDockerImage $RdfDockerImage `
@@ -626,8 +855,8 @@ Set-Content -LiteralPath $webYamlPath -Value $webYaml -Encoding utf8
 Set-Content -LiteralPath $workerYamlPath -Value $workerYaml -Encoding utf8
 
 try {
-  Invoke-Az -Arguments @("containerapp", "create", "--resource-group", $ResourceGroup, "--yaml", $webYamlPath, "--output", "none")
-  Invoke-Az -Arguments @("containerapp", "create", "--resource-group", $ResourceGroup, "--yaml", $workerYamlPath, "--output", "none")
+  Invoke-Az -Arguments @("containerapp", "create", "--name", $WebAppName, "--resource-group", $ResourceGroup, "--yaml", $webYamlPath, "--output", "none")
+  Invoke-Az -Arguments @("containerapp", "create", "--name", $WorkerAppName, "--resource-group", $ResourceGroup, "--yaml", $workerYamlPath, "--output", "none")
 
   $webPrincipalId = (& az containerapp show --name $WebAppName --resource-group $ResourceGroup --query identity.principalId -o tsv)
   if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($webPrincipalId)) {
@@ -667,9 +896,19 @@ finally {
 }
 
 $webFqdn = (& az containerapp show --name $WebAppName --resource-group $ResourceGroup --query properties.configuration.ingress.fqdn -o tsv)
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($webFqdn)) {
+  throw "Unable to determine the web app FQDN."
+}
+$githubCallbackUrl = ""
+if (-not [string]::IsNullOrWhiteSpace($webFqdn)) {
+  $githubCallbackUrl = "https://$webFqdn/accounts/github/callback/"
+}
 
 Write-Host "Deployment resources created."
 Write-Host "Web app FQDN: $webFqdn"
+if (-not [string]::IsNullOrWhiteSpace($githubCallbackUrl)) {
+  Write-Host "GitHub OAuth callback URL: $githubCallbackUrl"
+}
 Write-Host "Registry: $acrLoginServer"
 Write-Host "PostgreSQL server: $PostgresServerName"
 Write-Host "Storage account: $StorageAccountName"

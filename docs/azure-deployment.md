@@ -6,6 +6,8 @@ This repository is designed to be deployed by an operator who is already signed 
 
 - Azure CLI installed and working locally.
 - The `containerapp` and `postgres flexible-server` Azure CLI command groups available.
+- The `Microsoft.DBforPostgreSQL`, `Microsoft.App`, and `Microsoft.OperationalInsights`
+  resource providers registered on the target subscription.
 - A private container registry image for the web front end.
 - A PostgreSQL admin password, Django `SECRET_KEY`, and any GitHub OAuth values you want to enable.
 - A PFX certificate file if you plan to bind a custom domain.
@@ -24,6 +26,30 @@ az account show --output table
 az account list --query "[?isDefault]" --output table
 az account set --subscription "<subscription-id-or-name>"
 ```
+
+If the PostgreSQL step fails with `MissingSubscriptionRegistration`, register the
+provider once for that subscription and rerun the script:
+
+```powershell
+az provider register --namespace Microsoft.DBforPostgreSQL --wait
+```
+
+If the Container Apps environment step fails with a similar provider error,
+register the Container Apps providers too:
+
+```powershell
+az provider register --namespace Microsoft.App --wait
+az provider register --namespace Microsoft.OperationalInsights --wait
+```
+
+The deployment defaults to `AZURE_CONTAINER_APPS_LOGS_DESTINATION=none`, which
+keeps the Container Apps environment cheap and avoids Log Analytics setup.
+If you want environment logs, set
+`AZURE_CONTAINER_APPS_LOGS_DESTINATION=log-analytics` and provide the workspace
+ID and key in the deploy config.
+If your local `containerapp` extension still auto-generates a workspace in the
+`none` path, the create script deletes that workspace right after the
+environment is created.
 
 The Azure scripts read a deployment config file automatically. Start from
 [scripts/azure/deploy.env.example](../scripts/azure/deploy.env.example) and
@@ -59,10 +85,12 @@ The backend job execution still pulls `hep-data-llm` analysis images at runtime,
 - `scripts/azure/create-resources.ps1`
   - Creates the resource group, registry, PostgreSQL server, storage account, Container Apps environment, and the web and worker apps.
   - Configures environment variables for database access, Django secrets, and backend image selection.
+  - Uses Azure Container Registry admin credentials for the initial web and worker image pull so the first revision can start immediately.
+  - Ensures the PostgreSQL server is on the cheapest Burstable `Standard_B1ms` compute shape before continuing.
   - Mounts Azure Files for persistent media and artifact storage.
 - `scripts/azure/delete-app-resources.ps1`
   - Deletes only the ephemeral application resources.
-  - Leaves the database, storage account, and registry in place.
+  - Stops the PostgreSQL server and leaves only storage in place.
 - `scripts/azure/delete-persistent-data.ps1`
   - Deletes the persistent database and storage resources.
   - This script is intentionally destructive and asks for confirmation.
@@ -73,18 +101,22 @@ The backend job execution still pulls `hep-data-llm` analysis images at runtime,
 2. Create a deployment config file anywhere you like, using
    `scripts/azure/deploy.env.example` as the baseline.
 3. Fill in the subscription, registry, Docker Hub image, and secret values.
-4. Run the create script with `-ConfigPath` pointing at your file.
+   You can leave the GitHub OAuth fields blank on the first pass if you want to
+   create the OAuth app only after you know the Azure callback URL.
+4. Run the create script with `-ConfigPath` pointing at your file:
+
+   ```powershell
+   .\scripts\azure\create-resources.ps1 -ConfigPath "C:\configs\hep-data-web-prod.env"
+   ```
+
 5. Upload and bind your certificate if you are using a custom hostname.
 6. Create a Django superuser or approve the first admin profile after the app comes up.
 
-Example deployment command:
-
-```powershell
-.\scripts\azure\create-resources.ps1 -ConfigPath "C:\configs\hep-data-web-prod.env"
-```
-
 If you want to override a value temporarily, you can still pass a parameter or
 set an environment variable before running the script, but that is optional.
+If you tear down only the app layer and rerun the create script later, the
+script will start an existing stopped PostgreSQL server before it recreates the
+app resources.
 
 ## Secrets and configuration
 
@@ -92,43 +124,82 @@ The scripts never commit secrets to the repository. They read sensitive values
 from the config file passed with `-ConfigPath`, fall back to the example
 defaults, and prompt securely when needed.
 
+If you are bootstrapping GitHub OAuth, you can leave `GITHUB_CLIENT_ID` and
+`AZURE_GITHUB_CLIENT_SECRET` blank for the first deployment. The create script
+prints the deployed web app FQDN and the callback URL after it finishes, so you
+can copy that exact URL into the GitHub OAuth app settings before rerunning the
+script with OAuth enabled.
+
 Recommended environment variables:
 
 - `AZURE_POSTGRES_ADMIN_PASSWORD`
 - `AZURE_DJANGO_SECRET_KEY`
 - `AZURE_GITHUB_CLIENT_SECRET`
 - `AZURE_CERTIFICATE_PASSWORD`
-- `SERVICEX_TOKEN`
+- `SERVICEX_CONFIG_PATH`
 - `OPENAI_API_KEY`
 - `DOCKER_HUB_USERNAME`
 - `DOCKER_HUB_PASSWORD`
 
 Non-secret values can also come from environment variables if you prefer not to pass them on the command line.
 
+For ServiceX, provide the path to your local `servicex.yaml` file. The script
+reads that file and mounts it into the Azure containers as a secret volume at
+runtime, so it never gets baked into the image.
+If the path is relative, the script resolves it relative to the deploy config
+file you passed with `-ConfigPath`.
+
+For OpenAI, keep using `OPENAI_API_KEY` in the deploy config. The Azure script
+maps that value into the container runtime variable
+`api_openai_com_API_KEY`, which is the name the backend subprocess actually
+sees.
+
 ## Certificate handling
 
-Use a local PFX file for the certificate. The create script accepts a certificate path and optional password.
+There are two hostname choices:
 
-For Container Apps, the certificate is uploaded to the Container Apps environment with `az containerapp env certificate upload`.
-After upload, bind the certificate to your custom hostname in the same environment.
+- Use the Azure-generated Container Apps hostname that the create script prints
+  as `Web app FQDN: ...`.
+- Use a custom domain such as `app.example.com`.
 
-If you do not have the final hostname yet, complete the deployment first and then bind the certificate once DNS is ready.
+If you use the Azure-generated hostname, you do not need to upload a
+certificate yourself.
 
-The default public hostname is the web app's Container Apps ingress FQDN. The
-create script prints it at the end of deployment as `Web app FQDN: ...`. If you
-are using that Azure-provided hostname, you do not need to request your own
-certificate. If you want a custom domain, the certificate should match the
-exact hostname you plan to bind, such as `app.example.com`.
+If you use a custom domain, complete these steps after the first deployment:
 
-Example certificate upload:
+1. Decide the exact hostname you want to use, for example `app.example.com`.
+2. Point DNS at the Container Apps app:
+   - For a subdomain, create a `CNAME` record from `app.example.com` to the
+     printed Container Apps hostname.
+   - For an apex domain, create the `A` and `TXT` records that Azure requires.
+3. Upload and bind the certificate to the app and hostname.
+
+If you are bringing your own certificate, use the PFX file on disk and run:
 
 ```powershell
-az containerapp env certificate upload `
-  -g "hep-data-web-prod" `
-  --name "hep-data-web-env" `
+az containerapp ssl upload `
+  --resource-group "hep-data-web-prod" `
+  --environment "hep-data-web-env" `
+  --name "hep-data-web-web" `
+  --hostname "app.example.com" `
   --certificate-file "C:\certs\hep-data-web.pfx" `
   --password "<pfx-password>"
 ```
+
+That command uploads the certificate to the Container Apps environment, adds
+the hostname to the app, and binds the certificate.
+
+If you want to inspect the hostname later, use:
+
+```powershell
+az containerapp hostname list `
+  --resource-group "hep-data-web-prod" `
+  --name "hep-data-web-web"
+```
+
+If you do not have the final hostname yet, finish deployment first, copy the
+printed FQDN from the script output, and then create the DNS record and upload
+the certificate once DNS is ready.
 
 ## Docker image pulls
 
@@ -166,31 +237,40 @@ Use one of these approaches:
 - Create a Django superuser through the web container.
 - Approve the first GitHub profile through the built-in admin flow.
 
-The choice depends on whether you are using local login testing or GitHub OAuth in Azure.
+If you have not finished GitHub OAuth yet, create the first superuser now.
 
-Example superuser bootstrap inside the web container:
+1. Open a shell in the running web container:
 
-```powershell
-az containerapp exec `
-  --name "hep-data-web-web" `
-  --resource-group "hep-data-web-prod" `
-  --container "web"
-```
+   ```powershell
+   az containerapp exec `
+     --resource-group "hep-data-web-prod" `
+     --name "hep-data-web-web" `
+     --container "web" `
+     --command bash
+   ```
 
-Then run this inside the container shell:
+   If `bash` is not available, use `/bin/sh` instead.
 
-```powershell
-uv run python manage.py createsuperuser
-```
+2. Run the Django management command inside that shell:
 
-If you already have a GitHub OAuth login configured, sign in through the app, then approve the first profile in the admin UI.
-The `az containerapp exec` command above is only for getting a shell inside the running container.
+   ```powershell
+   uv run python manage.py createsuperuser
+   ```
+
+3. Follow the prompts for username, email, and password.
+
+If you are using GitHub OAuth instead of a local superuser, sign in through the
+site after OAuth is configured, then approve the first profile in the admin UI.
+The `az containerapp exec` command above is only for getting a shell inside the
+running container.
 
 ## Teardown
 
 Use the normal teardown script to remove only the application resources when you want to recycle the app layer.
+That script stops PostgreSQL so only storage charges remain.
 
 Use the destructive persistent-data script only when you explicitly want to remove the database and storage contents.
+That script removes the remaining billable state as well.
 
 Example teardown commands:
 

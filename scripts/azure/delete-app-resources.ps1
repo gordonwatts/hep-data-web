@@ -5,7 +5,8 @@ param(
   [string]$ResourceGroup = "",
   [string]$ContainerAppsEnvironmentName = "",
   [string]$WebAppName = "",
-  [string]$WorkerAppName = ""
+  [string]$WorkerAppName = "",
+  [string]$PostgresServerName = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -122,9 +123,20 @@ if ([string]::IsNullOrWhiteSpace($WorkerAppName)) {
     $WorkerAppName = [Environment]::GetEnvironmentVariable("AZURE_WORKER_APP_NAME")
   }
 }
+if ([string]::IsNullOrWhiteSpace($PostgresServerName)) {
+  if ($userConfig.ContainsKey("AZURE_POSTGRES_SERVER_NAME")) {
+    $PostgresServerName = $userConfig["AZURE_POSTGRES_SERVER_NAME"]
+  }
+  elseif ($defaultConfig.ContainsKey("AZURE_POSTGRES_SERVER_NAME")) {
+    $PostgresServerName = $defaultConfig["AZURE_POSTGRES_SERVER_NAME"]
+  }
+  elseif (-not [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable("AZURE_POSTGRES_SERVER_NAME"))) {
+    $PostgresServerName = [Environment]::GetEnvironmentVariable("AZURE_POSTGRES_SERVER_NAME")
+  }
+}
 
-if ([string]::IsNullOrWhiteSpace($ResourceGroup) -or [string]::IsNullOrWhiteSpace($ContainerAppsEnvironmentName) -or [string]::IsNullOrWhiteSpace($WebAppName) -or [string]::IsNullOrWhiteSpace($WorkerAppName)) {
-  throw "Missing deployment settings. Provide a config file with -ConfigPath or override AZURE_RESOURCE_GROUP, AZURE_CONTAINER_APPS_ENVIRONMENT_NAME, AZURE_WEB_APP_NAME, and AZURE_WORKER_APP_NAME."
+if ([string]::IsNullOrWhiteSpace($ResourceGroup) -or [string]::IsNullOrWhiteSpace($ContainerAppsEnvironmentName) -or [string]::IsNullOrWhiteSpace($WebAppName) -or [string]::IsNullOrWhiteSpace($WorkerAppName) -or [string]::IsNullOrWhiteSpace($PostgresServerName)) {
+  throw "Missing deployment settings. Provide a config file with -ConfigPath or override AZURE_RESOURCE_GROUP, AZURE_CONTAINER_APPS_ENVIRONMENT_NAME, AZURE_WEB_APP_NAME, AZURE_WORKER_APP_NAME, and AZURE_POSTGRES_SERVER_NAME."
 }
 
 Write-Host "Removing ephemeral application resources from resource group '$ResourceGroup'..."
@@ -133,4 +145,9 @@ Invoke-Az -Arguments @("containerapp", "delete", "--name", $WorkerAppName, "--re
 Invoke-Az -Arguments @("containerapp", "delete", "--name", $WebAppName, "--resource-group", $ResourceGroup, "--yes", "--output", "none")
 Invoke-Az -Arguments @("containerapp", "env", "delete", "--name", $ContainerAppsEnvironmentName, "--resource-group", $ResourceGroup, "--yes", "--output", "none")
 
-Write-Host "Application resources removed. Persistent database and storage resources were not touched."
+$postgresState = (& az postgres flexible-server show --resource-group $ResourceGroup --name $PostgresServerName --query state -o tsv)
+if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($postgresState) -and $postgresState -ne "Stopped") {
+  Invoke-Az -Arguments @("postgres", "flexible-server", "stop", "--resource-group", $ResourceGroup, "--name", $PostgresServerName)
+}
+
+Write-Host "Application resources removed. PostgreSQL is stopped; persistent storage resources were not touched."
