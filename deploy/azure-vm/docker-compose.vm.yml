@@ -58,7 +58,7 @@ services:
 
   web:
     image: ${AZURE_VM_IMAGE}
-    command: uv run gunicorn hep_data_web.wsgi:application --bind 0.0.0.0:8000
+    command: uv run gunicorn hep_data_web.wsgi:application --bind 0.0.0.0:8000 --access-logfile - --error-logfile - --log-level info
     env_file:
       - ../env/.env
     environment:

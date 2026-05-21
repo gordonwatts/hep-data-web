@@ -22,6 +22,8 @@ def test_azure_vm_compose_file_uses_the_expected_services_and_commands():
     assert "caddy:2.8" in compose
     assert "AZURE_VM_IMAGE" in compose
     assert "uv run gunicorn hep_data_web.wsgi:application" in compose
+    assert "--access-logfile -" in compose
+    assert "--error-logfile -" in compose
     assert "uv run python manage.py run_worker" in compose
     assert "80:80" in compose
     assert "443:443" in compose
