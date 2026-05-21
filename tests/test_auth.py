@@ -128,6 +128,41 @@ class AuthFlowTests(TestCase):
         self.assertNotContains(status_response, "Sign in again with GitHub")
         self.assertNotContains(status_response, "Relogin with GitHub")
 
+    def test_github_callback_ignores_admin_notification_email_failures(self):
+        session = self.client.session
+        session[SESSION_OAUTH_STATE_KEY] = "state-123"
+        session[SESSION_OAUTH_NEXT_KEY] = "/"
+        session.save()
+
+        with (
+            patch("portal.views.exchange_code_for_token", return_value="token"),
+            patch(
+                "portal.views.fetch_github_account",
+                return_value={
+                    "id": "123456",
+                    "login": "octocat",
+                    "name": "Octo Cat",
+                    "avatar_url": "https://example.org/avatar.png",
+                    "email": "octocat@example.org",
+                    "html_url": "https://github.com/octocat",
+                },
+            ),
+            patch("portal.notifications.send_mail", side_effect=OSError("smtp unavailable")),
+        ):
+            response = self.client.get(
+                reverse("github-callback"),
+                {"state": "state-123", "code": "code-abc"},
+            )
+
+        self.assertRedirects(
+            response,
+            reverse("auth-status"),
+            fetch_redirect_response=False,
+        )
+        profile = UserProfile.objects.get(github_id="123456")
+        self.assertEqual(profile.approval_state, ApprovalState.PENDING)
+        self.assertFalse(self.client.session[SESSION_APPROVED_LOGIN_KEY])
+
     def test_github_callback_turns_github_http_errors_into_login_redirect(self):
         session = self.client.session
         session[SESSION_OAUTH_STATE_KEY] = "state-123"

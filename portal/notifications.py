@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import logging
+
 from django.conf import settings
 from django.core.mail import send_mail
 
 from portal.models import ApprovalState
+
+logger = logging.getLogger(__name__)
 
 
 def _admin_recipients() -> list[str]:
@@ -12,6 +16,17 @@ def _admin_recipients() -> list[str]:
         if email:
             recipients.add(email)
     return sorted(recipients)
+
+
+def _send_mail_best_effort(subject: str, message: str, recipients: list[str]) -> None:
+    try:
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, recipients)
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "Unable to send notification email for recipients %s",
+            ", ".join(recipients),
+            exc_info=True,
+        )
 
 
 def notify_admins_new_pending_user(profile) -> None:
@@ -32,7 +47,7 @@ def notify_admins_new_pending_user(profile) -> None:
             "Review them at /admin/users/ while signed in as an admin.",
         ]
     )
-    send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, recipients)
+    _send_mail_best_effort(subject, message, recipients)
 
 
 def notify_user_account_decision(profile, *, decision: ApprovalState) -> None:
@@ -59,4 +74,4 @@ def notify_user_account_decision(profile, *, decision: ApprovalState) -> None:
             ]
         )
 
-    send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [recipient])
+    _send_mail_best_effort(subject, message, [recipient])
