@@ -44,3 +44,10 @@ def test_azure_vm_deploy_script_maps_openai_key_to_backend_variable():
 
     assert "api_openai_com_API_KEY" in deploy_script
     assert "OPENAI_API_KEY = $OpenAiApiKey" in deploy_script
+
+
+def test_azure_vm_deploy_script_copies_servicex_config_to_home_and_data_mount():
+    deploy_script = Path("scripts/azure-vm/deploy-compose.ps1").read_text(encoding="utf-8")
+
+    assert "$remoteBase/servicex.yaml" in deploy_script
+    assert "$remoteHome/servicex.yaml" in deploy_script

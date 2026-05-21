@@ -194,6 +194,7 @@ if (-not [string]::IsNullOrWhiteSpace($ServiceXConfigPath)) {
     throw "SERVICEX_CONFIG_PATH was provided but the file was not found: $resolvedServiceXConfigPath"
   }
 
+  Copy-FileToVm -Source $resolvedServiceXConfigPath -Hostname $VmHost -User $AdminUser -PrivateKeyPath $SshPrivateKeyPath -Destination "$remoteBase/servicex.yaml"
   Copy-FileToVm -Source $resolvedServiceXConfigPath -Hostname $VmHost -User $AdminUser -PrivateKeyPath $SshPrivateKeyPath -Destination "$remoteHome/servicex.yaml"
 }
 
