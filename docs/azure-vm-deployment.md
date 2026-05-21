@@ -117,6 +117,22 @@ docker compose exec web uv run python manage.py run_smoke_job
 docker compose restart worker
 ```
 
+To inspect web requests and request-time errors on the VM, read the `web`
+container logs. Gunicorn access logs are written there, so callback failures and
+500s show up alongside the request path:
+
+```powershell
+cd /srv/hep-data-web/compose
+docker compose --env-file /srv/hep-data-web/env/.env -f docker-compose.vm.yml logs --tail 200 web
+```
+
+If the problem looks like a proxy or TLS issue instead of an app error, check
+the `caddy` logs too:
+
+```powershell
+docker compose --env-file /srv/hep-data-web/env/.env -f docker-compose.vm.yml logs --tail 200 caddy
+```
+
 ## Backup and restore
 
 Back up the database and artifacts from the VM, then copy the result to Azure
