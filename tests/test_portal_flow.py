@@ -116,6 +116,29 @@ class PortalFlowTests(TestCase):
         self.assertContains(response, "Running")
         self.assertContains(response, 'data-terminal="false"', html=False)
 
+    def test_job_detail_partial_allows_staff_visibility(self):
+        job = Job.objects.create(
+            owner=self.owner,
+            original_prompt="Plot ETmiss",
+            resolved_dataset="dataset",
+            backend_profile="rdf",
+            status=JobStatus.RUNNING,
+            started_at=timezone.now() - timedelta(minutes=2),
+            queue_position=1,
+        )
+
+        self.client.force_login(self.other)
+        self.other.is_staff = True
+        self.other.save(update_fields=["is_staff"])
+
+        response = self.client.get(
+            reverse("job-detail-status", kwargs={"submission_id": job.submission_id})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Running")
+        self.assertContains(response, 'data-terminal="false"', html=False)
+
     def test_job_detail_partial_renders_queued_state(self):
         job = Job.objects.create(
             owner=self.owner,

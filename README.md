@@ -62,7 +62,9 @@ directory, such as the mounted path inside Docker Compose.
 ## Azure Deployment
 
 For Azure setup, teardown, certificates, and persistent-data deletion, see
-[docs/azure-deployment.md](docs/azure-deployment.md).
+[docs/azure-deployment.md](docs/azure-deployment.md). The deployment scripts
+read [scripts/azure/deploy.env.example](scripts/azure/deploy.env.example) as
+defaults and then overlay the file you pass with `-ConfigPath`.
 
 ## Local Login
 
@@ -113,10 +115,12 @@ and pushes to `main`.
 
 For the release image workflow, configure these repository secrets:
 
-- `REGISTRY_SERVER`
-- `REGISTRY_USERNAME`
-- `REGISTRY_PASSWORD`
-- `IMAGE_NAME`
+Use Docker Hub values here:
+
+- `REGISTRY_SERVER` = `docker.io`
+- `REGISTRY_USERNAME` = your Docker Hub username or org robot account
+- `REGISTRY_PASSWORD` = a Docker Hub access token or password
+- `IMAGE_NAME` = the Docker Hub repository path, such as `myuser/hep-data-web`
 
 The workflow publishes on GitHub release publication and tags the image with
 the release version plus `latest`. If you run it manually, provide the release

@@ -308,38 +308,38 @@ This plan keeps the existing architecture. Do not execute analysis work from HTT
   - Any Azure publish credentials if used later.
 - [x] Add a CI status note to `README.md`.
   - Keep it concise.
-- [ ] Validate locally before committing.
+- [x] Validate locally before committing.
   - Run `uv run pytest`.
   - Run `uv run ruff check .`.
   - Run `uv run ruff format --check .`.
 
 ### 10. Azure Deployment Scripts and Instructions (Issue #9)
 
-- [ ] Create `docs/azure-deployment.md`.
+- [x] Create `docs/azure-deployment.md`.
   - State prerequisite: operator is already logged in with `az login`.
   - List required Azure CLI version assumptions if known.
   - Explain first-time setup variables.
   - Explain certificate requirements, expected local certificate path, and where the certificate is registered.
   - Explain Docker registry auth and token handling without committing tokens.
   - Explain admin bootstrap: create Django superuser or approved admin profile after first deploy.
-- [ ] Create `scripts/azure/create-resources.ps1`.
+- [x] Create `scripts/azure/create-resources.ps1`.
   - Parameters should include resource group, location, app name prefix, container registry/image, database names, certificate path, and secrets source.
   - Create persistent database resources separately from ephemeral app resources.
   - Create storage or volumes needed for media/artifacts if used by the selected Azure service.
   - Configure app and worker environment variables.
   - Do not embed secrets; read them from environment variables or prompt securely.
-- [ ] Create `scripts/azure/delete-app-resources.ps1`.
+- [x] Create `scripts/azure/delete-app-resources.ps1`.
   - Delete only ephemeral app/container/service resources.
   - Preserve database and persistent storage.
   - Make this the normal teardown command.
-- [ ] Create `scripts/azure/delete-persistent-data.ps1`.
+- [x] Create `scripts/azure/delete-persistent-data.ps1`.
   - Use explicit destructive naming and confirmation prompt.
   - Delete database and persistent storage only when explicitly invoked.
-- [ ] Update `.env.example` if Azure-specific runtime variables are introduced.
-- [ ] Add docs for private Docker image pulls.
+- [x] Update `.env.example` if Azure-specific runtime variables are introduced.
+- [x] Add docs for private Docker image pulls.
   - Include token/credential setup through Azure or registry mechanisms.
   - Do not commit tokens or real credentials.
-- [ ] Manual verification checklist in docs.
+- [x] Manual verification checklist in docs.
   - Create resources from scratch.
   - Deploy web and worker.
   - Confirm login/approval/job metadata persists after app resource teardown/recreate.
@@ -347,14 +347,14 @@ This plan keeps the existing architecture. Do not execute analysis work from HTT
 
 ### 11. Privacy and Permission Boundaries
 
-- [ ] For every new view or partial endpoint, use existing `_job_or_404(request, submission_id)` or equivalent owner/admin check.
-- [ ] Do not expose artifact paths for other users in live status responses.
-- [ ] Do not put prompts, generated code, or artifact metadata into CI logs or deployment scripts.
-- [ ] Add regression tests for the live partial endpoint.
+- [x] For every new view or partial endpoint, use existing `_job_or_404(request, submission_id)` or equivalent owner/admin check.
+- [x] Do not expose artifact paths for other users in live status responses.
+- [x] Do not put prompts, generated code, or artifact metadata into CI logs or deployment scripts.
+- [x] Add regression tests for the live partial endpoint.
   - Owner allowed.
   - Other regular user receives 404.
   - Staff/admin behavior should match existing full job detail behavior.
-- [ ] Verify admin-only docs/scripts do not commit secrets.
+- [x] Verify admin-only docs/scripts do not commit secrets.
 
 ## Test Plan
 
