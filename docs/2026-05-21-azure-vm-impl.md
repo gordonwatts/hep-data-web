@@ -36,7 +36,7 @@ This plan is intentionally docs-first and migration-safe. Keep the existing Azur
 - **Artifacts/media:** keep filesystem-backed media/artifacts in Compose volumes stored under `/srv/hep-data-web`.
 - **Docker daemon:** use the VM's local Docker Engine and preserve the current Docker-in-Docker Compose service if that remains the most compatible backend path.
 - **Ingress:** expose only HTTP/HTTPS and SSH at the Azure Network Security Group. Restrict SSH to the operator IP when possible.
-- **TLS:** prefer Caddy on the VM for automatic HTTPS. Use the Azure-generated VM DNS label or a custom domain CNAME/A record.
+- **TLS:** use Caddy with Let's Encrypt automatic certificates and renewal by default. Use the Azure-generated VM DNS label or a custom domain CNAME/A record.
 - **Registry:** pull the app image directly from Docker Hub or GitHub Container Registry. Do not require Azure Container Registry for the VM path.
 - **Secrets:** keep a production `.env` on the VM outside the repo checkout, with file permissions restricted to the deploy user.
 - **Migrations:** preserve the current Compose `migrate` service so database schema setup remains automatic.
@@ -71,6 +71,7 @@ This plan is intentionally docs-first and migration-safe. Keep the existing Azur
   - Operator-focused instructions for the VM deployment.
   - Cost guidance and SKU selection notes.
   - First-time setup, secrets, DNS, TLS, backup, restore, upgrade, and teardown procedures.
+  - Explicit Let's Encrypt certificate setup and renewal verification steps.
 - `docs/azure-deployment.md`
   - Update to clearly mark the existing Container Apps path as the managed PaaS path.
   - Link to the VM deployment path as the recommended low-cost hobby deployment.
@@ -83,8 +84,12 @@ This plan is intentionally docs-first and migration-safe. Keep the existing Azur
   - Production Compose file and Caddy config.
 - `/srv/hep-data-web/env/`
   - Production `.env` and any external config files.
+- `/srv/hep-data-web/env/certs/`
+  - Optional manually supplied certificate and key files if not using Let's Encrypt.
 - `/srv/hep-data-web/data/`
   - Docker volume storage if using bind-mounted volume paths.
+- `/srv/hep-data-web/data/caddy/`
+  - Caddy state, including automatically issued Let's Encrypt certificates and renewal metadata.
 - `/srv/hep-data-web/backups/`
   - Local staging area for backups before upload.
 - `/srv/hep-data-web/logs/`
@@ -133,6 +138,11 @@ Add VM-specific variables only when needed:
 - `AZURE_VM_SSH_PUBLIC_KEY_PATH`
 - `AZURE_VM_DATA_DISK_SIZE_GB`
 - `AZURE_VM_DNS_LABEL`
+- `AZURE_VM_PUBLIC_HOSTNAME`
+- `AZURE_VM_TLS_EMAIL`
+- `AZURE_VM_TLS_MODE=letsencrypt`
+- `AZURE_VM_TLS_CERT_PATH`
+- `AZURE_VM_TLS_KEY_PATH`
 - `AZURE_VM_ALLOWED_SSH_CIDR`
 - `AZURE_VM_IMAGE`
 - `AZURE_VM_DATA_MOUNT=/srv/hep-data-web`
@@ -177,8 +187,21 @@ Add VM-specific variables only when needed:
   - Mount the data disk.
   - Install Docker.
   - Write production `.env`.
+  - Point DNS at the VM public IP before enabling public HTTPS.
+  - Configure Caddy for Let's Encrypt using the public hostname and operator email.
   - Start Compose.
   - Create or approve the first admin user.
+- [ ] Document HTTPS setup with Let's Encrypt.
+  - Explain that ports 80 and 443 must both be reachable for normal automatic issuance and renewal.
+  - Explain that Caddy stores ACME account and certificate state under the persistent data disk.
+  - Include the expected Caddyfile shape for `https://<hostname>` reverse proxying to `web:8000`.
+  - Include a renewal verification command, such as checking `docker compose logs caddy` and the browser certificate issuer.
+  - Note that Let's Encrypt renewal is automatic while Caddy is running and storage is persisted.
+- [ ] Document a manual certificate fallback.
+  - Store certificate and key files under `/srv/hep-data-web/env/certs`.
+  - Mount that directory read-only into the reverse proxy.
+  - Configure Caddy or nginx to use the mounted cert/key paths.
+  - Make manual renewal an explicit operator responsibility for this fallback mode.
 - [ ] Document routine operations.
   - Pull a new image and restart.
   - View service status.
@@ -229,7 +252,15 @@ Add VM-specific variables only when needed:
 - [ ] Add Caddy or reverse proxy service if selected.
   - Expose ports 80 and 443.
   - Proxy to `web:8000`.
-  - Store Caddy data/config under the data disk for certificate persistence.
+  - Use Let's Encrypt automatic certificates by default.
+  - Set Caddy's ACME contact email from `AZURE_VM_TLS_EMAIL` or the deployment config.
+  - Store Caddy data/config under the data disk for certificate persistence and renewal continuity.
+  - Mount any manually supplied certificate files only for the explicit manual-cert mode.
+- [ ] Add a Caddyfile template.
+  - Accept `AZURE_VM_PUBLIC_HOSTNAME` or equivalent as the public site name.
+  - Reverse proxy to the internal web service.
+  - Preserve the original host and scheme headers needed by Django.
+  - Include a local HTTP-only option only for throwaway testing, not production.
 
 ### 4. Add VM Resource Creation Script
 
@@ -241,6 +272,7 @@ Add VM-specific variables only when needed:
 - [ ] Create a virtual network, subnet, network security group, public IP, and network interface.
   - Allow inbound 80 and 443 from the internet.
   - Allow inbound 22 only from `AZURE_VM_ALLOWED_SSH_CIDR` when provided.
+  - Document that Let's Encrypt HTTP-01 validation requires inbound port 80 unless a different ACME challenge is deliberately implemented.
 - [ ] Create the VM.
   - Default size `Standard_B2s`.
   - Ubuntu LTS image.
@@ -268,6 +300,10 @@ Add VM-specific variables only when needed:
   - Connect to the VM over SSH/SCP.
   - Create the remote deployment directories.
 - [ ] Copy Compose files and reverse proxy config to the VM.
+- [ ] Render or copy the Caddyfile.
+  - Use the configured public hostname for Let's Encrypt issuance.
+  - Use the configured ACME email when available.
+  - Refuse production HTTPS deployment if no public hostname is configured.
 - [ ] Copy or render a production `.env` template only when explicitly requested.
   - Do not overwrite an existing remote `.env` unless `-ForceEnv` or similar is provided.
   - Never print secret values.
@@ -280,6 +316,8 @@ Add VM-specific variables only when needed:
   - `docker compose ps`.
   - `docker compose logs --tail`.
   - HTTP health or homepage check if the host is reachable.
+  - HTTPS check for the public hostname after DNS is live.
+  - Caddy log check showing successful certificate issuance or reuse.
 - [ ] Print admin bootstrap commands.
   - `docker compose exec web uv run python manage.py createsuperuser`.
   - Link to the approval admin page.
@@ -342,6 +380,9 @@ Add VM-specific variables only when needed:
 - [ ] Require SSH key authentication.
 - [ ] Do not expose Docker API outside the Compose network.
 - [ ] Do not expose Postgres outside the Compose network.
+- [ ] Keep the reverse proxy as the only public web entry point.
+  - Public ports should be 80 and 443 only.
+  - The Django `web` container port should not be exposed directly to the internet.
 - [ ] Store production `.env` outside git.
   - Suggested path: `/srv/hep-data-web/env/.env`.
   - File mode should be readable only by the deploy user/root where practical.
@@ -359,6 +400,10 @@ Add VM-specific variables only when needed:
 - [ ] Verify Compose starts all services.
 - [ ] Verify migrations run automatically before web/worker.
 - [ ] Verify the homepage loads through the public HTTPS URL.
+- [ ] Verify the HTTPS certificate is issued by Let's Encrypt in the default path.
+- [ ] Verify Caddy certificate state persists under `/srv/hep-data-web/data/caddy`.
+- [ ] Verify a Compose restart does not request a fresh certificate unnecessarily.
+- [ ] Verify the plan documents manual cert/key installation for non-Let's Encrypt deployments.
 - [ ] Verify admin bootstrap works.
 - [ ] Verify a user can submit one job and the worker processes it.
 - [ ] Verify backend execution can access a Docker daemon on the VM.
