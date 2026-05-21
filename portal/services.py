@@ -186,7 +186,7 @@ def run_backend_job(job: Job) -> JobExecutionResult:
     if output_path.exists():
         markdown_text = output_path.read_text(encoding="utf-8")
 
-    image_paths = tuple(sorted(output_dir.glob("img/*.png")))
+    image_paths = tuple(sorted(output_dir.rglob("*.png")))
     metadata = {
         "command": _backend_command_for_job(job, output_path),
         "output_path": str(output_path),

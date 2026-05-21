@@ -267,3 +267,57 @@ class ArtifactConventionTests(TestCase):
         assert "OPENAI_API_KEY=outer-secret" in base_env
         assert "api_openai_com_API_KEY=outer-secret" in home_env
         assert "OPENAI_API_KEY=outer-secret" in home_env
+
+    def test_run_backend_job_collects_nested_png_artifacts(self):
+        user = get_user_model().objects.create_user(username="nested-image-user")
+        job = Job.objects.create(
+            owner=user,
+            original_prompt="prompt",
+            resolved_dataset="dataset",
+            backend_profile="rdf",
+            status=JobStatus.RUNNING,
+        )
+        completed = subprocess.CompletedProcess(args=["dummy"], returncode=0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            base_dir = temp_path / "app"
+            home_dir = temp_path / "home"
+            artifact_root = temp_path / "artifacts"
+            base_dir.mkdir()
+            home_dir.mkdir()
+
+            def fake_run(command, **kwargs):
+                output_path = Path(command[5])
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                output_path.write_text(
+                    "## Result\n\n```python\nprint('hello world')\n```\n",
+                    encoding="utf-8",
+                )
+                nested_png = output_path.parent / "img" / "nested" / "plot.png"
+                nested_png.parent.mkdir(parents=True, exist_ok=True)
+                nested_png.write_bytes(b"png")
+                return completed
+
+            with patch.dict(
+                os.environ,
+                {"api_openai_com_API_KEY": "outer-secret"},
+                clear=False,
+            ):
+                with patch.object(services.settings, "BASE_DIR", base_dir):
+                    with patch.object(services.settings, "ARTIFACT_ROOT", artifact_root):
+                        with patch.object(
+                            services.settings,
+                            "HEP_DATA_LLM_HOME_DIR",
+                            str(home_dir),
+                        ):
+                            with patch("portal.services.subprocess.run", side_effect=fake_run):
+                                result = services.run_backend_job(job)
+
+        artifact_paths = [str(path) for path in result.artifact_paths]
+        assert any(path.endswith("result.md") for path in artifact_paths)
+        assert any(path.endswith(r"img\nested\plot.png") for path in artifact_paths)
+        assert any(
+            Path(path).parts[-3:] == ("img", "nested", "plot.png")
+            for path in result.metadata["image_paths"]
+        )
