@@ -71,3 +71,7 @@ def test_base_settings_expose_docker_execution_overrides(monkeypatch):
 def test_base_settings_default_job_poll_interval_is_one():
     module = importlib.reload(base)
     assert module.JOB_POLL_INTERVAL_SECONDS == 1
+
+
+def test_staticfiles_storage_uses_whitenoise_manifest_backend():
+    assert base.STORAGES["staticfiles"]["BACKEND"] == "whitenoise.storage.CompressedManifestStaticFilesStorage"

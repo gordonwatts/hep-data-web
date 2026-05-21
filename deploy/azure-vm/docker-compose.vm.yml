@@ -56,6 +56,38 @@ services:
       postgres:
         condition: service_started
 
+  collectstatic:
+    image: ${AZURE_VM_IMAGE}
+    command: uv run python manage.py collectstatic --noinput
+    env_file:
+      - ../env/.env
+    environment:
+      DJANGO_SETTINGS_MODULE: hep_data_web.settings.prod
+      DATABASE_URL: postgresql://hep_data_web:${POSTGRES_PASSWORD:-hep_data_web}@postgres:5432/hep_data_web
+      DOCKER_HOST: tcp://docker:2375
+      HOME: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}
+      USERPROFILE: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}
+      TMPDIR: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/tmp
+      HEP_DATA_LLM_HOME_DIR: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}
+    volumes:
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/media
+        target: /app/media
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/staticfiles
+        target: /app/staticfiles
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/tmp
+        target: /tmp
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/home
+        target: /host-home
+    depends_on:
+      docker:
+        condition: service_started
+      postgres:
+        condition: service_started
+
   web:
     image: ${AZURE_VM_IMAGE}
     command: uv run gunicorn hep_data_web.wsgi:application --bind 0.0.0.0:8000 --access-logfile - --error-logfile - --log-level info
@@ -88,6 +120,8 @@ services:
       postgres:
         condition: service_started
       migrate:
+        condition: service_completed_successfully
+      collectstatic:
         condition: service_completed_successfully
 
   worker:
