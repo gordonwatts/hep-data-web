@@ -2,6 +2,18 @@
 
 This repository is designed to be deployed by an operator who is already signed in to Azure with `az login`.
 
+This page covers the existing managed Container Apps deployment path. It stays
+available for operators who already use it, but it is not the recommended
+low-traffic hobby deployment anymore. For the simpler VM Compose path, see
+[docs/azure-vm-deployment.md](azure-vm-deployment.md).
+
+## Deployment choices
+
+| Path | What it uses | Operational shape | Recommended for |
+| --- | --- | --- | --- |
+| Managed Container Apps | Container Apps, PostgreSQL Flexible Server, Azure Storage, ACR | More managed services, more Azure resources, more moving parts | Teams that want a managed PaaS stack and already run it |
+| VM Compose | One Linux VM, Docker Compose, persistent disk, Caddy | Closer to local `docker compose up`, simpler and usually cheaper | Small hobby deployments and low-traffic single-user setups |
+
 ## Prerequisites
 
 - Azure CLI installed and working locally.
@@ -76,6 +88,9 @@ The deployment scripts create a small Azure stack:
 - Azure Database for PostgreSQL flexible server for persistent relational data
 - Azure Storage for persistent media and artifact files
 - Azure Container Registry for the application image
+
+That managed stack is still supported, but it is heavier than the VM Compose
+path and requires more Azure-side maintenance.
 
 The worker and web app use the same application image, but the worker runs `run_worker` instead of the web server command.
 The backend job execution still pulls `hep-data-llm` analysis images at runtime, so the scripts also configure the profile-specific image settings used by the app.

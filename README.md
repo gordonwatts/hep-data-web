@@ -62,8 +62,12 @@ directory, such as the mounted path inside Docker Compose.
 ## Azure Deployment
 
 For Azure setup, teardown, certificates, and persistent-data deletion, see
-[docs/azure-deployment.md](docs/azure-deployment.md). The deployment scripts
-read [scripts/azure/deploy.env.example](scripts/azure/deploy.env.example) as
+[docs/azure-deployment.md](docs/azure-deployment.md) for the managed Container
+Apps path and [docs/azure-vm-deployment.md](docs/azure-vm-deployment.md) for
+the recommended VM Compose path.
+
+The existing Container Apps deployment scripts read
+[scripts/azure/deploy.env.example](scripts/azure/deploy.env.example) as
 defaults and then overlay the file you pass with `-ConfigPath`.
 
 ## Local Login

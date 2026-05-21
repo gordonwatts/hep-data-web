@@ -127,6 +127,17 @@ class AuthFlowTests(TestCase):
         self.assertNotContains(status_response, "Sign in again with GitHub")
         self.assertNotContains(status_response, "Relogin with GitHub")
 
+    @override_settings(
+        GITHUB_CLIENT_ID="client",
+        GITHUB_CLIENT_SECRET="secret",
+        PUBLIC_BASE_URL="https://hep-data-llm.eastus.cloudapp.azure.com",
+    )
+    def test_github_login_redirect_uses_https_callback_when_public_base_url_is_set(self):
+        response = self.client.get(reverse("github-login"))
+
+        self.assertIn("redirect_uri=https%3A%2F%2F", response["Location"])
+        self.assertIn("%2Faccounts%2Fgithub%2Fcallback%2F", response["Location"])
+
     def test_admin_can_approve_user_and_user_refreshes_into_app(self):
         target_user = get_user_model().objects.create_user(
             username="pending-user",

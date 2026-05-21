@@ -1,0 +1,8 @@
+{
+  email {$AZURE_VM_TLS_EMAIL}
+}
+
+{$AZURE_VM_PUBLIC_HOSTNAME} {
+  encode zstd gzip
+  reverse_proxy web:8000
+}

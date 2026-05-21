@@ -1,0 +1,146 @@
+services:
+  docker:
+    image: docker:29-dind
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    command: ["--host=tcp://0.0.0.0:2375"]
+    volumes:
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/docker
+        target: /var/lib/docker
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/tmp
+        target: /tmp
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: hep_data_web
+      POSTGRES_USER: hep_data_web
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hep_data_web}
+    volumes:
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/postgres
+        target: /var/lib/postgresql/data
+
+  migrate:
+    image: ${AZURE_VM_IMAGE}
+    command: uv run python manage.py migrate --noinput
+    env_file:
+      - ../env/.env
+    environment:
+      DJANGO_SETTINGS_MODULE: hep_data_web.settings.prod
+      DATABASE_URL: postgresql://hep_data_web:${POSTGRES_PASSWORD:-hep_data_web}@postgres:5432/hep_data_web
+      DOCKER_HOST: tcp://docker:2375
+      HOME: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}
+      USERPROFILE: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}
+      TMPDIR: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/tmp
+      HEP_DATA_LLM_HOME_DIR: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}
+    volumes:
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/media
+        target: /app/media
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/staticfiles
+        target: /app/staticfiles
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/tmp
+        target: /tmp
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/home
+        target: /host-home
+    depends_on:
+      docker:
+        condition: service_started
+      postgres:
+        condition: service_started
+
+  web:
+    image: ${AZURE_VM_IMAGE}
+    command: uv run gunicorn hep_data_web.wsgi:application --bind 0.0.0.0:8000
+    env_file:
+      - ../env/.env
+    environment:
+      DJANGO_SETTINGS_MODULE: hep_data_web.settings.prod
+      DATABASE_URL: postgresql://hep_data_web:${POSTGRES_PASSWORD:-hep_data_web}@postgres:5432/hep_data_web
+      DOCKER_HOST: tcp://docker:2375
+      HOME: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}
+      USERPROFILE: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}
+      TMPDIR: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/tmp
+      HEP_DATA_LLM_HOME_DIR: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}
+    volumes:
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/media
+        target: /app/media
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/staticfiles
+        target: /app/staticfiles
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/tmp
+        target: /tmp
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/home
+        target: /host-home
+    depends_on:
+      docker:
+        condition: service_started
+      postgres:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    image: ${AZURE_VM_IMAGE}
+    command: uv run python manage.py run_worker
+    env_file:
+      - ../env/.env
+    environment:
+      DJANGO_SETTINGS_MODULE: hep_data_web.settings.prod
+      DATABASE_URL: postgresql://hep_data_web:${POSTGRES_PASSWORD:-hep_data_web}@postgres:5432/hep_data_web
+      DOCKER_HOST: tcp://docker:2375
+      HOME: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}
+      USERPROFILE: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}
+      TMPDIR: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/tmp
+      HEP_DATA_LLM_HOME_DIR: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}
+    volumes:
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/media
+        target: /app/media
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/staticfiles
+        target: /app/staticfiles
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/tmp
+        target: /tmp
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/home
+        target: /host-home
+    depends_on:
+      docker:
+        condition: service_started
+      postgres:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+
+  caddy:
+    image: caddy:2.8
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      AZURE_VM_PUBLIC_HOSTNAME: ${AZURE_VM_PUBLIC_HOSTNAME}
+      AZURE_VM_TLS_EMAIL: ${AZURE_VM_TLS_EMAIL}
+    volumes:
+      - type: bind
+        source: ./Caddyfile
+        target: /etc/caddy/Caddyfile
+        read_only: true
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/caddy
+        target: /data
+      - type: bind
+        source: ${AZURE_VM_DATA_MOUNT:-/srv/hep-data-web}/data/caddy-config
+        target: /config

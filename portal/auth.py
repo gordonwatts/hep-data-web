@@ -41,7 +41,11 @@ def safe_next_url(request, next_url: str | None) -> str | None:
 
 
 def github_callback_url(request) -> str:
-    return request.build_absolute_uri(resolve_url("github-callback"))
+    public_base_url = getattr(settings, "PUBLIC_BASE_URL", "")
+    callback_path = resolve_url("github-callback")
+    if public_base_url:
+        return f"{public_base_url.rstrip('/')}{callback_path}"
+    return request.build_absolute_uri(callback_path)
 
 
 def start_github_login(request, next_url: str | None = None) -> str:
