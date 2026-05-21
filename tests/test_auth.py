@@ -188,6 +188,40 @@ class AuthFlowTests(TestCase):
             fetch_redirect_response=False,
         )
 
+    def test_github_callback_logs_unexpected_errors_and_redirects_to_login(self):
+        session = self.client.session
+        session[SESSION_OAUTH_STATE_KEY] = "state-123"
+        session[SESSION_OAUTH_NEXT_KEY] = "/"
+        session.save()
+
+        with (
+            patch("portal.views.exchange_code_for_token", return_value="token"),
+            patch(
+                "portal.views.fetch_github_account",
+                return_value={
+                    "id": "123456",
+                    "login": "octocat",
+                    "name": "Octo Cat",
+                    "avatar_url": "https://example.org/avatar.png",
+                    "email": "octocat@example.org",
+                    "html_url": "https://github.com/octocat",
+                },
+            ),
+            patch("portal.views.get_or_create_profile_from_github", side_effect=RuntimeError("boom")),
+        ):
+            with self.assertLogs("portal.views", level="ERROR") as logs:
+                response = self.client.get(
+                    reverse("github-callback"),
+                    {"state": "state-123", "code": "code-abc"},
+                )
+
+        self.assertRedirects(
+            response,
+            reverse("login"),
+            fetch_redirect_response=False,
+        )
+        self.assertTrue(any("GitHub callback failed after successful authorization" in line for line in logs.output))
+
     @override_settings(
         GITHUB_CLIENT_ID="client",
         GITHUB_CLIENT_SECRET="secret",

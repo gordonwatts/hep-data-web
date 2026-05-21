@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import mimetypes
 import urllib.error
 from pathlib import Path
@@ -42,6 +43,8 @@ from portal.notifications import (
     notify_user_account_decision,
 )
 from portal.services import QueueFullError, create_job
+
+logger = logging.getLogger(__name__)
 
 JOB_BADGE_CLASSES = {
     JobStatus.QUEUED: "text-bg-secondary",
@@ -192,15 +195,28 @@ def github_callback(request):
         messages.error(request, f"GitHub login failed: {exc}")
         return HttpResponseRedirect(reverse("login"))
 
-    profile = get_or_create_profile_from_github(account)
-    if profile.approval_state == ApprovalState.PENDING and profile.pending_notified_at is None:
-        notify_admins_new_pending_user(profile)
-        profile.pending_notified_at = timezone.now()
-        profile.save(update_fields=["pending_notified_at"])
+    try:
+        profile = get_or_create_profile_from_github(account)
+        if profile.approval_state == ApprovalState.PENDING and profile.pending_notified_at is None:
+            notify_admins_new_pending_user(profile)
+            profile.pending_notified_at = timezone.now()
+            profile.save(update_fields=["pending_notified_at"])
 
-    approved = profile.approval_state == ApprovalState.APPROVED
-    next_url = safe_next_url(request, request.session.get(SESSION_OAUTH_NEXT_KEY))
-    login_user(request, profile, approved=approved, next_url=next_url)
+        approved = profile.approval_state == ApprovalState.APPROVED
+        next_url = safe_next_url(request, request.session.get(SESSION_OAUTH_NEXT_KEY))
+        login_user(request, profile, approved=approved, next_url=next_url)
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "GitHub callback failed after successful authorization for %s",
+            account.get("login") or account.get("id") or "unknown account",
+        )
+        request.session.pop(SESSION_OAUTH_STATE_KEY, None)
+        request.session.pop(SESSION_OAUTH_NEXT_KEY, None)
+        messages.error(
+            request,
+            "GitHub login completed, but we could not finish signing you in. Please try again.",
+        )
+        return HttpResponseRedirect(reverse("login"))
 
     request.session.pop(SESSION_OAUTH_STATE_KEY, None)
     request.session.pop(SESSION_OAUTH_NEXT_KEY, None)
