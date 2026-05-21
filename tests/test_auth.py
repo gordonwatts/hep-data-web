@@ -1,4 +1,5 @@
 from unittest.mock import patch
+import urllib.error
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase, override_settings
@@ -126,6 +127,31 @@ class AuthFlowTests(TestCase):
         status_response = self.client.get(reverse("auth-status"))
         self.assertNotContains(status_response, "Sign in again with GitHub")
         self.assertNotContains(status_response, "Relogin with GitHub")
+
+    def test_github_callback_turns_github_http_errors_into_login_redirect(self):
+        session = self.client.session
+        session[SESSION_OAUTH_STATE_KEY] = "state-123"
+        session[SESSION_OAUTH_NEXT_KEY] = "/"
+        session.save()
+
+        http_error = urllib.error.HTTPError(
+            url="https://github.com/login/oauth/access_token",
+            code=400,
+            msg="Bad Request",
+            hdrs=None,
+            fp=None,
+        )
+        with patch("portal.views.exchange_code_for_token", side_effect=http_error):
+            response = self.client.get(
+                reverse("github-callback"),
+                {"state": "state-123", "code": "code-abc"},
+            )
+
+        self.assertRedirects(
+            response,
+            reverse("login"),
+            fetch_redirect_response=False,
+        )
 
     @override_settings(
         GITHUB_CLIENT_ID="client",

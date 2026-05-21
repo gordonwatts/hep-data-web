@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import mimetypes
+import urllib.error
 from pathlib import Path
 from random import sample
 
@@ -187,7 +188,7 @@ def github_callback(request):
     try:
         access_token = exchange_code_for_token(code=code, redirect_uri=redirect_uri)
         account = fetch_github_account(access_token)
-    except (OSError, PermissionDenied) as exc:
+    except (OSError, PermissionDenied, urllib.error.URLError) as exc:
         messages.error(request, f"GitHub login failed: {exc}")
         return HttpResponseRedirect(reverse("login"))
 
