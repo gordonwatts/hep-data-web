@@ -37,3 +37,10 @@ def test_azure_vm_config_example_includes_the_expected_settings():
     assert "AZURE_VM_TLS_MODE=http" in env_example
     assert "JOB_QUEUE_LIMIT=3" in env_example
     assert "AZURE_BACKUP_CONNECTION_STRING" in env_example
+
+
+def test_azure_vm_deploy_script_maps_openai_key_to_backend_variable():
+    deploy_script = Path("scripts/azure-vm/deploy-compose.ps1").read_text(encoding="utf-8")
+
+    assert "api_openai_com_API_KEY" in deploy_script
+    assert "OPENAI_API_KEY = $OpenAiApiKey" in deploy_script

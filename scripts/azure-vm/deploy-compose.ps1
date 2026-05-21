@@ -148,6 +148,7 @@ $runtimeEnv = @{
   GITHUB_ADMIN_USERS = $GithubAdminUsers
   ADMIN_EMAILS = $AdminEmails
   OPENAI_API_KEY = $OpenAiApiKey
+  api_openai_com_API_KEY = $OpenAiApiKey
   SERVICEX_CONFIG_PATH = $ServiceXConfigPath
   HEP_DATA_LLM_HOME_DIR = $HePHomeDir
   HEP_DATA_LLM_SERVICEX_AWKWARD_DOCKER_IMAGE = $ServiceXAwkwardImage

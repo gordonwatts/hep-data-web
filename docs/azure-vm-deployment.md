@@ -59,6 +59,10 @@ before deployment. The deploy script copies it to
 `/srv/hep-data-web/data/home/servicex.yaml` on the VM, which the backend sees
 as `~/servicex.yaml`.
 
+For OpenAI, keep `OPENAI_API_KEY` in the deploy config. The VM deploy script
+exports it as `api_openai_com_API_KEY` inside the container because that is the
+name the backend job runner expects.
+
 For GitHub OAuth, register this callback URL in the GitHub app:
 
 `https://hep-data-llm.eastus.cloudapp.azure.com/accounts/github/callback/`
