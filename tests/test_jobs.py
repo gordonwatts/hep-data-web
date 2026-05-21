@@ -1,6 +1,8 @@
 import os
 import subprocess
+import tempfile
 from datetime import timedelta
+from pathlib import Path
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -221,3 +223,47 @@ class ArtifactConventionTests(TestCase):
         env = mock_run.call_args.kwargs["env"]
         assert env["HOME"] == "/host-home"
         assert env["USERPROFILE"] == "/host-home"
+
+    def test_run_backend_job_writes_openai_key_to_visible_env_files(self):
+        user = get_user_model().objects.create_user(username="env-user")
+        job = Job.objects.create(
+            owner=user,
+            original_prompt="prompt",
+            resolved_dataset="dataset",
+            backend_profile="rdf",
+            status=JobStatus.RUNNING,
+        )
+        completed = subprocess.CompletedProcess(args=["dummy"], returncode=0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            base_dir = temp_path / "app"
+            home_dir = temp_path / "home"
+            artifact_root = temp_path / "artifacts"
+            base_dir.mkdir()
+            home_dir.mkdir()
+
+            with patch.dict(
+                os.environ,
+                {"api_openai_com_API_KEY": "outer-secret"},
+                clear=False,
+            ):
+                with patch.object(services.settings, "BASE_DIR", base_dir):
+                    with patch.object(services.settings, "ARTIFACT_ROOT", artifact_root):
+                        with patch.object(
+                            services.settings,
+                            "HEP_DATA_LLM_HOME_DIR",
+                            str(home_dir),
+                        ):
+                            with patch(
+                                "portal.services.subprocess.run", return_value=completed
+                            ):
+                                services.run_backend_job(job)
+
+            base_env = (base_dir / ".env").read_text(encoding="utf-8")
+            home_env = (home_dir / ".env").read_text(encoding="utf-8")
+
+        assert "api_openai_com_API_KEY=outer-secret" in base_env
+        assert "OPENAI_API_KEY=outer-secret" in base_env
+        assert "api_openai_com_API_KEY=outer-secret" in home_env
+        assert "OPENAI_API_KEY=outer-secret" in home_env

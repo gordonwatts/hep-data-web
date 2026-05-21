@@ -90,6 +90,43 @@ def _backend_cache_root() -> Path:
     return cache_root
 
 
+def _write_backend_env_file(home_dir: Path) -> None:
+    api_key = (
+        str(os.environ.get("api_openai_com_API_KEY", "")).strip()
+        or str(os.environ.get("OPENAI_API_KEY", "")).strip()
+    )
+    if not api_key:
+        return
+
+    env_file = home_dir / ".env"
+    env_file.parent.mkdir(parents=True, exist_ok=True)
+    existing_lines = []
+    if env_file.exists():
+        existing_lines = env_file.read_text(encoding="utf-8").splitlines()
+
+    remaining_values = {
+        "api_openai_com_API_KEY": api_key,
+        "OPENAI_API_KEY": api_key,
+    }
+    updated_lines: list[str] = []
+    for line in existing_lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in line:
+            updated_lines.append(line)
+            continue
+
+        key = line.split("=", 1)[0].strip()
+        if key in remaining_values:
+            updated_lines.append(f"{key}={remaining_values.pop(key)}")
+        else:
+            updated_lines.append(line)
+
+    for key, value in remaining_values.items():
+        updated_lines.append(f"{key}={value}")
+
+    env_file.write_text("\n".join(updated_lines) + "\n", encoding="utf-8")
+
+
 def _backend_command_for_job(job: Job, output_path: Path) -> list[str]:
     prompt = render_job_prompt(job.original_prompt, job.resolved_dataset)
     command = [
@@ -132,6 +169,8 @@ def run_backend_job(job: Job) -> JobExecutionResult:
     if home_dir:
         env["HOME"] = home_dir
         env["USERPROFILE"] = home_dir
+        _write_backend_env_file(Path(home_dir))
+    _write_backend_env_file(Path(settings.BASE_DIR))
     env["XDG_CACHE_HOME"] = str(_backend_cache_root())
 
     proc = subprocess.run(
