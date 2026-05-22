@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import yaml
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -127,6 +128,25 @@ def _write_backend_env_file(home_dir: Path) -> None:
     env_file.write_text("\n".join(updated_lines) + "\n", encoding="utf-8")
 
 
+def _write_backend_servicex_file(target_dir: Path) -> None:
+    source_path = str(os.environ.get("SERVICEX_CONFIG_PATH", "")).strip()
+    if not source_path:
+        return
+
+    source_file = Path(source_path)
+    if not source_file.exists():
+        return
+
+    loaded = yaml.safe_load(source_file.read_text(encoding="utf-8"))
+    if not isinstance(loaded, dict):
+        loaded = {}
+    loaded["cache_path"] = "/cache"
+
+    target_file = target_dir / "servicex.yaml"
+    target_file.parent.mkdir(parents=True, exist_ok=True)
+    target_file.write_text(yaml.safe_dump(loaded, sort_keys=False), encoding="utf-8")
+
+
 def _backend_command_for_job(job: Job, output_path: Path) -> list[str]:
     prompt = render_job_prompt(job.original_prompt, job.resolved_dataset)
     command = [
@@ -170,6 +190,9 @@ def run_backend_job(job: Job) -> JobExecutionResult:
         env["HOME"] = home_dir
         env["USERPROFILE"] = home_dir
         _write_backend_env_file(Path(home_dir))
+        _write_backend_servicex_file(Path(home_dir))
+    else:
+        _write_backend_servicex_file(Path(settings.BASE_DIR))
     _write_backend_env_file(Path(settings.BASE_DIR))
     env["XDG_CACHE_HOME"] = str(_backend_cache_root())
 

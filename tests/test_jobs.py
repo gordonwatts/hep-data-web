@@ -5,6 +5,7 @@ from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
 
+import yaml
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
@@ -255,9 +256,7 @@ class ArtifactConventionTests(TestCase):
                             "HEP_DATA_LLM_HOME_DIR",
                             str(home_dir),
                         ):
-                            with patch(
-                                "portal.services.subprocess.run", return_value=completed
-                            ):
+                            with patch("portal.services.subprocess.run", return_value=completed):
                                 services.run_backend_job(job)
 
             base_env = (base_dir / ".env").read_text(encoding="utf-8")
@@ -267,6 +266,95 @@ class ArtifactConventionTests(TestCase):
         assert "OPENAI_API_KEY=outer-secret" in base_env
         assert "api_openai_com_API_KEY=outer-secret" in home_env
         assert "OPENAI_API_KEY=outer-secret" in home_env
+
+    def test_run_backend_job_writes_servicex_config_to_home_dir(self):
+        user = get_user_model().objects.create_user(username="servicex-home-user")
+        job = Job.objects.create(
+            owner=user,
+            original_prompt="prompt",
+            resolved_dataset="dataset",
+            backend_profile="rdf",
+            status=JobStatus.RUNNING,
+        )
+        completed = subprocess.CompletedProcess(args=["dummy"], returncode=0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            base_dir = temp_path / "app"
+            home_dir = temp_path / "home"
+            source_dir = temp_path / "source"
+            artifact_root = temp_path / "artifacts"
+            base_dir.mkdir()
+            home_dir.mkdir()
+            source_dir.mkdir()
+            source_file = source_dir / "servicex.yaml"
+            source_file.write_text(
+                "dataset: test\ncache_path: /wrong\nnested:\n  value: 1\n",
+                encoding="utf-8",
+            )
+
+            with patch.dict(
+                os.environ,
+                {
+                    "SERVICEX_CONFIG_PATH": str(source_file),
+                    "api_openai_com_API_KEY": "outer-secret",
+                },
+                clear=False,
+            ):
+                with patch.object(services.settings, "BASE_DIR", base_dir):
+                    with patch.object(services.settings, "ARTIFACT_ROOT", artifact_root):
+                        with patch.object(
+                            services.settings,
+                            "HEP_DATA_LLM_HOME_DIR",
+                            str(home_dir),
+                        ):
+                            with patch("portal.services.subprocess.run", return_value=completed):
+                                services.run_backend_job(job)
+
+            home_servicex = yaml.safe_load((home_dir / "servicex.yaml").read_text(encoding="utf-8"))
+            assert home_servicex["dataset"] == "test"
+            assert home_servicex["cache_path"] == "/cache"
+            assert home_servicex["nested"]["value"] == 1
+            assert not (base_dir / "servicex.yaml").exists()
+
+    def test_run_backend_job_writes_servicex_config_to_base_dir_when_home_is_unset(self):
+        user = get_user_model().objects.create_user(username="servicex-base-user")
+        job = Job.objects.create(
+            owner=user,
+            original_prompt="prompt",
+            resolved_dataset="dataset",
+            backend_profile="rdf",
+            status=JobStatus.RUNNING,
+        )
+        completed = subprocess.CompletedProcess(args=["dummy"], returncode=0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            base_dir = temp_path / "app"
+            source_dir = temp_path / "source"
+            artifact_root = temp_path / "artifacts"
+            base_dir.mkdir()
+            source_dir.mkdir()
+            source_file = source_dir / "servicex.yaml"
+            source_file.write_text("dataset: test\n", encoding="utf-8")
+
+            with patch.dict(
+                os.environ,
+                {
+                    "SERVICEX_CONFIG_PATH": str(source_file),
+                    "api_openai_com_API_KEY": "outer-secret",
+                },
+                clear=False,
+            ):
+                with patch.object(services.settings, "BASE_DIR", base_dir):
+                    with patch.object(services.settings, "ARTIFACT_ROOT", artifact_root):
+                        with patch.object(services.settings, "HEP_DATA_LLM_HOME_DIR", ""):
+                            with patch("portal.services.subprocess.run", return_value=completed):
+                                services.run_backend_job(job)
+
+            base_servicex = yaml.safe_load((base_dir / "servicex.yaml").read_text(encoding="utf-8"))
+            assert base_servicex["dataset"] == "test"
+            assert base_servicex["cache_path"] == "/cache"
 
     def test_run_backend_job_collects_nested_png_artifacts(self):
         user = get_user_model().objects.create_user(username="nested-image-user")
