@@ -106,8 +106,11 @@ scripts/azure/deploy.env
 azure.env
 azure-deploy.env
 azure-vm-deploy.env
+hep-data-web-azure-vm
+hep-data-web-azure-vm.pub
 .venv
 .uv-cache/
+uv.lock
 env/
 venv/
 ENV/
