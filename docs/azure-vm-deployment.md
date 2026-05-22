@@ -55,9 +55,9 @@ The deployment scripts use this layout on the VM:
 7. If you later want HTTPS, add a hostname, switch `AZURE_VM_TLS_MODE` to `letsencrypt`, and redeploy.
 
 If you use ServiceX, point `SERVICEX_CONFIG_PATH` at your local `servicex.yaml`
-before deployment. The deploy script copies it to the VM home directory so the
-backend can read `~/servicex.yaml`, and it also keeps a copy under the
-persistent data mount for compatibility.
+before deployment. The deploy script copies it to the VM home directory and the
+container sees that file at `/host-home/servicex.yaml`. The backend then copies
+that into the job workspace before it launches `hep-data-llm plot`.
 
 For OpenAI, keep `OPENAI_API_KEY` in the deploy config. The VM deploy script
 exports it as `api_openai_com_API_KEY` inside the container because that is the

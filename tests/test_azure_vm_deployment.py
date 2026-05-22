@@ -51,3 +51,5 @@ def test_azure_vm_deploy_script_copies_servicex_config_to_home_and_data_mount():
 
     assert "$remoteBase/servicex.yaml" in deploy_script
     assert "$remoteHome/servicex.yaml" in deploy_script
+    assert "$ServiceXContainerPath" in deploy_script
+    assert "/host-home/servicex.yaml" in deploy_script
