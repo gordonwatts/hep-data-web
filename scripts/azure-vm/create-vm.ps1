@@ -17,12 +17,17 @@ param(
 
 . "$PSScriptRoot\_common.ps1"
 
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+
 if ([string]::IsNullOrWhiteSpace($DefaultsPath)) {
   $DefaultsPath = Join-Path $PSScriptRoot "deploy.env.example"
 }
 if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
   $ConfigPath = Join-Path $PSScriptRoot "deploy.env"
 }
+
+$DefaultsPath = Resolve-ExistingRelativePath -PathValue $DefaultsPath -SearchDirectories @($PSScriptRoot, $repoRoot)
+$ConfigPath = Resolve-ExistingRelativePath -PathValue $ConfigPath -SearchDirectories @((Get-Location).Path, $repoRoot)
 
 $defaultConfig = Read-DotEnvFile -PathValue $DefaultsPath
 $userConfig = Read-DotEnvFile -PathValue $ConfigPath
@@ -47,7 +52,7 @@ if ([string]::IsNullOrWhiteSpace($SshPublicKeyPath)) {
   throw "AZURE_VM_SSH_PUBLIC_KEY_PATH is required."
 }
 
-$resolvedSshKeyPath = [System.IO.Path]::GetFullPath($SshPublicKeyPath)
+$resolvedSshKeyPath = Resolve-ExistingRelativePath -PathValue $SshPublicKeyPath -SearchDirectories @((Split-Path -Parent $ConfigPath), $repoRoot, (Get-Location).Path)
 if (-not (Test-Path -LiteralPath $resolvedSshKeyPath)) {
   throw "SSH public key file not found: $resolvedSshKeyPath"
 }

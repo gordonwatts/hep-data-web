@@ -10,12 +10,17 @@ param(
 
 . "$PSScriptRoot\_common.ps1"
 
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+
 if ([string]::IsNullOrWhiteSpace($DefaultsPath)) {
   $DefaultsPath = Join-Path $PSScriptRoot "deploy.env.example"
 }
 if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
   $ConfigPath = Join-Path $PSScriptRoot "deploy.env"
 }
+
+$DefaultsPath = Resolve-ExistingRelativePath -PathValue $DefaultsPath -SearchDirectories @($PSScriptRoot, $repoRoot)
+$ConfigPath = Resolve-ExistingRelativePath -PathValue $ConfigPath -SearchDirectories @((Get-Location).Path, $repoRoot)
 
 $defaultConfig = Read-DotEnvFile -PathValue $DefaultsPath
 $userConfig = Read-DotEnvFile -PathValue $ConfigPath
@@ -26,6 +31,7 @@ $VmName = Get-ResolvedValue -ExplicitValue $VmName -ConfigValues $userConfig -De
 $AdminUser = Get-ResolvedValue -ExplicitValue $AdminUser -ConfigValues $userConfig -DefaultValues $defaultConfig -Name "AZURE_VM_ADMIN_USER" -DefaultValue "hepadmin"
 $VmHost = Get-ResolvedValue -ConfigValues $userConfig -DefaultValues $defaultConfig -Name "AZURE_VM_PUBLIC_HOSTNAME"
 $publicKeyPath = Get-ResolvedValue -ConfigValues $userConfig -DefaultValues $defaultConfig -Name "AZURE_VM_SSH_PUBLIC_KEY_PATH"
+$publicKeyPath = Resolve-ExistingRelativePath -PathValue $publicKeyPath -SearchDirectories @((Split-Path -Parent $ConfigPath), $repoRoot, (Get-Location).Path)
 $privateKeyPath = Get-SshPrivateKeyPath -PublicKeyPath $publicKeyPath -PrivateKeyPath (Get-ResolvedValue -ConfigValues $userConfig -DefaultValues $defaultConfig -Name "AZURE_VM_SSH_PRIVATE_KEY_PATH")
 $VmDataMount = Get-ResolvedValue -ConfigValues $userConfig -DefaultValues $defaultConfig -Name "AZURE_VM_DATA_MOUNT" -DefaultValue "/srv/hep-data-web"
 $BackupStorageConnectionString = Get-ResolvedValue -ConfigValues $userConfig -DefaultValues $defaultConfig -Name "AZURE_BACKUP_CONNECTION_STRING"

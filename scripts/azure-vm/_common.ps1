@@ -64,6 +64,35 @@ function Read-DotEnvFile {
   return $values
 }
 
+function Resolve-ExistingRelativePath {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$PathValue,
+    [string[]]$SearchDirectories = @()
+  )
+
+  if ([string]::IsNullOrWhiteSpace($PathValue)) {
+    return $PathValue
+  }
+
+  if ([System.IO.Path]::IsPathRooted($PathValue)) {
+    return [System.IO.Path]::GetFullPath($PathValue)
+  }
+
+  foreach ($baseDirectory in $SearchDirectories) {
+    if ([string]::IsNullOrWhiteSpace($baseDirectory)) {
+      continue
+    }
+
+    $candidatePath = [System.IO.Path]::GetFullPath((Join-Path $baseDirectory $PathValue))
+    if (Test-Path -LiteralPath $candidatePath) {
+      return $candidatePath
+    }
+  }
+
+  return [System.IO.Path]::GetFullPath($PathValue)
+}
+
 function Get-ResolvedValue {
   param(
     [string]$ExplicitValue,

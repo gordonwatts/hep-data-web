@@ -32,6 +32,20 @@ The deployment scripts use this layout on the VM:
 - `/srv/hep-data-web/backups/` for local backup staging.
 - `/srv/hep-data-web/logs/` for operator logs if desired.
 
+## VM disks and persistence
+
+Azure gives the VM one operating-system disk and one separate managed data disk.
+
+- The persistent data disk is named `hep-data-web-vm-data` by default.
+- The VM OS disk will look like `hep-data-web-vm_disk1_<guid>`.
+- The OS disk is disposable compute state; the data disk is where the
+  database, Docker layers, uploads, and Caddy state live.
+- If you delete and recreate the VM, Azure will create a fresh OS disk name.
+  That is expected and does not mean the user database was lost.
+- The `delete-vm.ps1` script now deletes the current VM OS disk when you tear
+  the VM down, but older orphaned OS disks from earlier recreates may still
+  need a one-time manual cleanup.
+
 ## First-time setup
 
 1. Create a deployment config file from
@@ -108,6 +122,27 @@ Manual cert mode is supported as a fallback:
 
 ## Routine operations
 
+Run these commands by opening an SSH session on the VM, or by using `az vm run-command`
+when you want a one-off non-interactive command from your local machine.
+The Azure VM host does not provide `uv` or `python`; those tools run inside the
+`web` container, so the command you execute on the VM is usually `docker compose exec`.
+
+SSH example:
+
+```powershell
+ssh -i .\hep-data-web-azure-vm hepadmin@hep-data-llm.eastus.cloudapp.azure.com
+```
+
+Azure run-command example:
+
+```powershell
+az vm run-command invoke `
+  --resource-group hep-data-web-vm `
+  --name hep-data-web-vm `
+  --command-id RunShellScript `
+  --scripts "cd /srv/hep-data-web/compose && docker compose --env-file /srv/hep-data-web/env/.env -f docker-compose.vm.yml exec -T web uv run python manage.py --help"
+```
+
 Common day-to-day commands on the VM:
 
 ```powershell
@@ -116,10 +151,33 @@ docker compose ps
 docker compose logs --tail 100 web
 docker compose pull
 docker compose up -d
-docker compose exec web uv run python manage.py createsuperuser
-docker compose exec web uv run python manage.py run_smoke_job
+docker compose --env-file /srv/hep-data-web/env/.env -f docker-compose.vm.yml exec -T web uv run python manage.py createsuperuser
+docker compose --env-file /srv/hep-data-web/env/.env -f docker-compose.vm.yml exec -T web uv run python manage.py run_smoke_job
 docker compose restart worker
 ```
+
+To inspect and manage user accounts from Windows PowerShell, use the helper
+scripts in `scripts/azure-vm/`:
+
+```powershell
+.\scripts\azure-vm\list-accounts.ps1 -ConfigPath ".\azure-vm-deploy.env"
+.\scripts\azure-vm\promote-account.ps1 -ConfigPath ".\azure-vm-deploy.env" -AccountName "github-1778366"
+```
+
+Use them like this:
+
+1. Run `list-accounts.ps1` from Windows PowerShell after the VM is up.
+2. Find the row for the user you want to change.
+3. Copy the unique account name from the `username` column, such as
+   `github-1778366`, or use the GitHub login if you know it.
+4. Run `promote-account.ps1` with that account name.
+5. Refresh `/accounts/status/` in the browser or sign out and back in if the
+   current session still shows the old state.
+
+`list-accounts.ps1` prints the Django username, GitHub login, role, approval
+state, and the user/profile ids. `promote-account.ps1` accepts the unique
+account name shown by that list, so you can use either the `github-...`
+username or the GitHub login if you know it.
 
 To inspect web requests and request-time errors on the VM, read the `web`
 container logs. Gunicorn access logs are written there, so callback failures and
@@ -168,6 +226,9 @@ To remove only the compute layer:
 ```powershell
 .\scripts\azure-vm\delete-vm.ps1 -ConfigPath "C:\configs\hep-data-web-vm.env"
 ```
+
+That removes the VM, its NIC, its public IP, and the current OS disk, while
+leaving `hep-data-web-vm-data` in place.
 
 To delete the persistent data only when you are sure you want to lose it:
 

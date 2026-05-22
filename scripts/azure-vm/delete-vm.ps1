@@ -32,6 +32,11 @@ if ($LASTEXITCODE -ne 0) {
   throw "Unable to inspect VM '$VmName'."
 }
 
+$osDiskId = & az vm show --resource-group $ResourceGroup --name $VmName --query "storageProfile.osDisk.managedDisk.id" -o tsv
+if ($LASTEXITCODE -ne 0) {
+  throw "Unable to inspect the OS disk for VM '$VmName'."
+}
+
 $publicIpId = $null
 if (-not [string]::IsNullOrWhiteSpace($nicId)) {
   $publicIpId = & az network nic show --ids $nicId --query "ipConfigurations[0].publicIpAddress.id" -o tsv
@@ -60,6 +65,27 @@ if (-not [string]::IsNullOrWhiteSpace($nicId)) {
     & az network nic delete --ids $nicId
     if ($LASTEXITCODE -ne 0) {
       throw "Failed to delete the VM network interface."
+    }
+  }
+}
+
+if (-not [string]::IsNullOrWhiteSpace($osDiskId)) {
+  $osDiskName = ($osDiskId -split "/")[-1]
+  $osDiskExists = $false
+  try {
+    $null = & az resource show --ids $osDiskId --output none
+    if ($LASTEXITCODE -eq 0) {
+      $osDiskExists = $true
+    }
+  }
+  catch {
+    $osDiskExists = $false
+  }
+  if ($osDiskExists) {
+    Write-Host "Deleting OS disk '$osDiskName'..."
+    & az disk delete --ids $osDiskId --yes --only-show-errors --output none
+    if ($LASTEXITCODE -ne 0) {
+      throw "Failed to delete the VM OS disk."
     }
   }
 }

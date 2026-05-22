@@ -12,12 +12,17 @@ param(
 
 . "$PSScriptRoot\_common.ps1"
 
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+
 if ([string]::IsNullOrWhiteSpace($DefaultsPath)) {
   $DefaultsPath = Join-Path $PSScriptRoot "deploy.env.example"
 }
 if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
   $ConfigPath = Join-Path $PSScriptRoot "deploy.env"
 }
+
+$DefaultsPath = Resolve-ExistingRelativePath -PathValue $DefaultsPath -SearchDirectories @($PSScriptRoot, $repoRoot)
+$ConfigPath = Resolve-ExistingRelativePath -PathValue $ConfigPath -SearchDirectories @((Get-Location).Path, $repoRoot)
 
 $defaultConfig = Read-DotEnvFile -PathValue $DefaultsPath
 $userConfig = Read-DotEnvFile -PathValue $ConfigPath
@@ -28,6 +33,7 @@ $VmName = Get-ResolvedValue -ExplicitValue $VmName -ConfigValues $userConfig -De
 $AdminUser = Get-ResolvedValue -ExplicitValue $AdminUser -ConfigValues $userConfig -DefaultValues $defaultConfig -Name "AZURE_VM_ADMIN_USER" -DefaultValue "hepadmin"
 $VmHost = Get-ResolvedValue -ExplicitValue $VmHost -ConfigValues $userConfig -DefaultValues $defaultConfig -Name "AZURE_VM_PUBLIC_HOSTNAME"
 $publicKeyPath = Get-ResolvedValue -ConfigValues $userConfig -DefaultValues $defaultConfig -Name "AZURE_VM_SSH_PUBLIC_KEY_PATH"
+$publicKeyPath = Resolve-ExistingRelativePath -PathValue $publicKeyPath -SearchDirectories @((Split-Path -Parent $ConfigPath), $repoRoot, (Get-Location).Path)
 $SshPrivateKeyPath = Get-ResolvedValue -ExplicitValue $SshPrivateKeyPath -ConfigValues $userConfig -DefaultValues $defaultConfig -Name "AZURE_VM_SSH_PRIVATE_KEY_PATH"
 $SshPrivateKeyPath = Get-SshPrivateKeyPath -PublicKeyPath $publicKeyPath -PrivateKeyPath $SshPrivateKeyPath
 $VmDataMount = Get-ResolvedValue -ConfigValues $userConfig -DefaultValues $defaultConfig -Name "AZURE_VM_DATA_MOUNT" -DefaultValue "/srv/hep-data-web"
@@ -179,8 +185,25 @@ $remoteEnv = "$remoteBase/env"
 $remoteCerts = "$remoteBase/env/certs"
 $remoteHome = "$remoteBase/data/home"
 
-$remoteSetup = "mkdir -p $remoteCompose $remoteEnv $remoteCerts $remoteBase/data/docker $remoteBase/data/postgres $remoteBase/data/media $remoteBase/data/staticfiles $remoteBase/data/tmp $remoteHome $remoteBase/data/caddy $remoteBase/data/caddy-config $remoteBase/backups $remoteBase/logs"
-Invoke-Ssh -Hostname $VmHost -User $AdminUser -PrivateKeyPath $SshPrivateKeyPath -Command @("mkdir", "-p", $remoteCompose, $remoteEnv, $remoteCerts, "$remoteBase/data/docker", "$remoteBase/data/postgres", "$remoteBase/data/media", "$remoteBase/data/staticfiles", "$remoteBase/data/tmp", $remoteHome, "$remoteBase/data/caddy", "$remoteBase/data/caddy-config", "$remoteBase/backups", "$remoteBase/logs")
+Invoke-Ssh -Hostname $VmHost -User $AdminUser -PrivateKeyPath $SshPrivateKeyPath -Command @(
+  "sudo", "install", "-d",
+  "-o", $AdminUser,
+  "-g", $AdminUser,
+  "-m", "755",
+  $remoteCompose,
+  $remoteEnv,
+  $remoteCerts,
+  "$remoteBase/data/docker",
+  "$remoteBase/data/postgres",
+  "$remoteBase/data/media",
+  "$remoteBase/data/staticfiles",
+  "$remoteBase/data/tmp",
+  $remoteHome,
+  "$remoteBase/data/caddy",
+  "$remoteBase/data/caddy-config",
+  "$remoteBase/backups",
+  "$remoteBase/logs"
+)
 if ($LASTEXITCODE -ne 0) {
   throw "Unable to prepare deployment directories on '$VmHost'."
 }
@@ -195,8 +218,18 @@ if (-not [string]::IsNullOrWhiteSpace($ServiceXConfigPath)) {
     throw "SERVICEX_CONFIG_PATH was provided but the file was not found: $resolvedServiceXConfigPath"
   }
 
-  Copy-FileToVm -Source $resolvedServiceXConfigPath -Hostname $VmHost -User $AdminUser -PrivateKeyPath $SshPrivateKeyPath -Destination "$remoteBase/servicex.yaml"
   Copy-FileToVm -Source $resolvedServiceXConfigPath -Hostname $VmHost -User $AdminUser -PrivateKeyPath $SshPrivateKeyPath -Destination "$remoteHome/servicex.yaml"
+  Invoke-Ssh -Hostname $VmHost -User $AdminUser -PrivateKeyPath $SshPrivateKeyPath -Command @(
+    "sudo", "install",
+    "-o", "root",
+    "-g", "root",
+    "-m", "0644",
+    "$remoteHome/servicex.yaml",
+    "$remoteBase/servicex.yaml"
+  )
+  if ($LASTEXITCODE -ne 0) {
+    throw "Unable to install ServiceX config to '$remoteBase/servicex.yaml'."
+  }
 }
 
 $remotePostCopy = @("chmod", "600", "$remoteEnv/.env", "&&", "cd", $remoteCompose, "&&", "docker", "compose", "--env-file", "$remoteEnv/.env", "-f", "docker-compose.vm.yml", "config")
