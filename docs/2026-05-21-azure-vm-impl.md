@@ -307,9 +307,6 @@ Add VM-specific variables only when needed:
 - [x] Copy or render a production `.env` template only when explicitly requested.
   - Do not overwrite an existing remote `.env` unless `-ForceEnv` or similar is provided.
   - Never print secret values.
-- [ ] Authenticate with the container registry if needed.
-  - Support Docker Hub or GHCR token through local environment/config.
-  - Prefer `docker login` on the VM only when the image is private.
 - [x] Pull images.
 - [x] Run `docker compose up -d`.
 - [x] Run a post-deploy status check.
@@ -343,10 +340,6 @@ Add VM-specific variables only when needed:
   - Create or reuse a storage account/container.
   - Use Azure CLI auth or a scoped SAS token.
   - Do not require Blob Storage for the minimal VM deployment.
-- [ ] Add a cron/systemd timer setup step.
-  - Daily database backup is enough for the expected usage.
-  - Keep local retention small, for example 7 daily backups.
-  - Keep remote retention documented.
 - [x] Document restore.
   - Stop web/worker.
   - Restore database dump into Postgres.
@@ -365,7 +358,6 @@ Add VM-specific variables only when needed:
   - Require typing `DELETE`.
   - Delete the managed data disk.
   - Optionally delete backup storage only when explicitly requested.
-- [ ] Add dry-run or `-WhatIf` support where practical.
 - [x] Document the difference between app teardown and persistent data deletion.
 
 ### 8. Update Runtime Defaults for Single-User Operation
@@ -397,8 +389,7 @@ Add VM-specific variables only when needed:
 - [x] Store production `.env` outside git.
   - Suggested path: `/srv/hep-data-web/env/.env`.
   - File mode should be readable only by the deploy user/root where practical.
-- [ ] Document OS patching.
-  - Enable unattended security upgrades or document a monthly patch command.
+- [ ] Document OS patching with unattended upgrades or a monthly patch command.
 - [x] Add a simple firewall note.
   - NSG is required.
   - `ufw` is optional if NSG rules are clear and minimal.
