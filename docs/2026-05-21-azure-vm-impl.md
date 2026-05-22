@@ -153,36 +153,36 @@ Add VM-specific variables only when needed:
 
 ### 1. Preserve Current Managed Azure Path
 
-- [ ] Rename or annotate the current Azure Container Apps documentation so it is clearly the managed PaaS deployment path.
+- [x] Rename or annotate the current Azure Container Apps documentation so it is clearly the managed PaaS deployment path.
   - Keep `docs/azure-deployment.md` intact enough for anyone already using it.
   - Add a short warning that it is operationally heavier and not the recommended hobby deployment.
-- [ ] Keep the existing `scripts/azure/` scripts in place during the VM implementation.
+- [x] Keep the existing `scripts/azure/` scripts in place during the VM implementation.
   - Do not delete the Container Apps scripts in the first pass.
   - Avoid breaking any existing operator workflow until the VM path is verified.
-- [ ] Add a brief comparison table to `docs/azure-deployment.md`.
+- [x] Add a brief comparison table to `docs/azure-deployment.md`.
   - Container Apps path: managed services, more moving parts, higher operational complexity.
   - VM Compose path: closer to local, simpler, likely cheaper, more VM maintenance.
 
 ### 2. Add VM Deployment Documentation
 
-- [ ] Create `docs/azure-vm-deployment.md`.
+- [x] Create `docs/azure-vm-deployment.md`.
   - Explain that this is the recommended path for the low-traffic hobby deployment.
   - State the expected monthly cost range for `B2s` plus a managed disk.
   - Explain when to choose `B1ms`, `B2s`, or `B2ms`.
-- [ ] Document prerequisites.
+- [x] Document prerequisites.
   - Azure CLI installed.
   - `az login` already completed.
   - SSH key available.
   - Published app image available in Docker Hub or GitHub Container Registry.
   - Production secrets available outside the repo.
-- [ ] Document first-time resource creation.
+- [x] Document first-time resource creation.
   - Resource group.
   - VM.
   - Network Security Group.
   - Public IP/DNS.
   - Data disk.
   - Optional backup storage account/container.
-- [ ] Document first deployment.
+- [x] Document first deployment.
   - Create `/srv/hep-data-web`.
   - Mount the data disk.
   - Install Docker.
@@ -191,72 +191,72 @@ Add VM-specific variables only when needed:
   - Configure Caddy for Let's Encrypt using the public hostname and operator email.
   - Start Compose.
   - Create or approve the first admin user.
-- [ ] Document HTTPS setup with Let's Encrypt.
+- [x] Document HTTPS setup with Let's Encrypt.
   - Explain that ports 80 and 443 must both be reachable for normal automatic issuance and renewal.
   - Explain that Caddy stores ACME account and certificate state under the persistent data disk.
   - Include the expected Caddyfile shape for `https://<hostname>` reverse proxying to `web:8000`.
   - Include a renewal verification command, such as checking `docker compose logs caddy` and the browser certificate issuer.
   - Note that Let's Encrypt renewal is automatic while Caddy is running and storage is persisted.
-- [ ] Document a manual certificate fallback.
+- [x] Document a manual certificate fallback.
   - Store certificate and key files under `/srv/hep-data-web/env/certs`.
   - Mount that directory read-only into the reverse proxy.
   - Configure Caddy or nginx to use the mounted cert/key paths.
   - Make manual renewal an explicit operator responsibility for this fallback mode.
-- [ ] Document routine operations.
+- [x] Document routine operations.
   - Pull a new image and restart.
   - View service status.
   - Read logs.
   - Run Django management commands.
   - Run a smoke job.
   - Restart the worker.
-- [ ] Document backup and restore.
+- [x] Document backup and restore.
   - Database dump command.
   - Media/artifact archive command.
   - Upload to Azure Blob Storage or keep a disk snapshot.
   - Restore to a fresh VM.
-- [ ] Document teardown.
+- [x] Document teardown.
   - Stop app.
   - Delete VM while preserving data disk.
   - Delete persistent data only with explicit confirmation.
 
 ### 3. Add Production VM Compose File
 
-- [ ] Decide whether to add `deploy/azure-vm/docker-compose.vm.yml` or reuse `docker-compose.yml` with overrides.
+- [x] Decide whether to add `deploy/azure-vm/docker-compose.vm.yml` or reuse `docker-compose.yml` with overrides.
   - Prefer a separate VM file if production should use a published image instead of `build: .`.
   - Keep the local development Compose file unchanged unless a shared improvement is needed.
-- [ ] Define the `web` service.
+- [x] Define the `web` service.
   - Use the published app image.
   - Run `uv run gunicorn hep_data_web.wsgi:application --bind 0.0.0.0:8000`.
   - Use `DJANGO_SETTINGS_MODULE=hep_data_web.settings.prod`.
   - Mount persistent media, static, temp, and home/config paths.
   - Depend on `postgres`, `docker`, and `migrate` as appropriate.
-- [ ] Define the `worker` service.
+- [x] Define the `worker` service.
   - Use the same app image.
   - Run `uv run python manage.py run_worker`.
   - Mount the same persistent paths needed for artifacts and backend config.
   - Use the same Docker daemon access strategy as local Compose.
   - Keep one worker replica only.
-- [ ] Define the `migrate` service.
+- [x] Define the `migrate` service.
   - Use the same app image.
   - Run `uv run python manage.py migrate --noinput`.
   - Gate `web` and `worker` startup on successful migration.
-- [ ] Define the `postgres` service.
+- [x] Define the `postgres` service.
   - Use `postgres:16`.
   - Store data under the persistent data disk.
   - Do not expose PostgreSQL publicly.
-- [ ] Define the Docker daemon/backend execution service.
+- [x] Define the Docker daemon/backend execution service.
   - Start from the existing local `docker:29-dind` service.
   - Preserve privileged mode only if required by backend execution.
   - Keep the Docker API private to the Compose network.
   - Persist Docker data under the data disk so backend images do not need to be pulled every run.
-- [ ] Add Caddy or reverse proxy service if selected.
+- [x] Add Caddy or reverse proxy service if selected.
   - Expose ports 80 and 443.
   - Proxy to `web:8000`.
   - Use Let's Encrypt automatic certificates by default.
   - Set Caddy's ACME contact email from `AZURE_VM_TLS_EMAIL` or the deployment config.
   - Store Caddy data/config under the data disk for certificate persistence and renewal continuity.
   - Mount any manually supplied certificate files only for the explicit manual-cert mode.
-- [ ] Add a Caddyfile template.
+- [x] Add a Caddyfile template.
   - Accept `AZURE_VM_PUBLIC_HOSTNAME` or equivalent as the public site name.
   - Reverse proxy to the internal web service.
   - Preserve the original host and scheme headers needed by Django.
@@ -264,61 +264,61 @@ Add VM-specific variables only when needed:
 
 ### 4. Add VM Resource Creation Script
 
-- [ ] Create `scripts/azure-vm/create-vm.ps1`.
+- [x] Create `scripts/azure-vm/create-vm.ps1`.
   - Load defaults from `scripts/azure-vm/deploy.env.example`.
   - Overlay a user-provided `-ConfigPath`.
   - Follow the dotenv parser pattern from existing Azure scripts where practical.
-- [ ] Create or update the resource group.
-- [ ] Create a virtual network, subnet, network security group, public IP, and network interface.
+- [x] Create or update the resource group.
+- [x] Create a virtual network, subnet, network security group, public IP, and network interface.
   - Allow inbound 80 and 443 from the internet.
   - Allow inbound 22 only from `AZURE_VM_ALLOWED_SSH_CIDR` when provided.
   - Document that Let's Encrypt HTTP-01 validation requires inbound port 80 unless a different ACME challenge is deliberately implemented.
-- [ ] Create the VM.
+- [x] Create the VM.
   - Default size `Standard_B2s`.
   - Ubuntu LTS image.
   - SSH key auth only.
   - Disable password authentication.
-- [ ] Create and attach a managed data disk.
+- [x] Create and attach a managed data disk.
   - Default 128 GiB Standard SSD LRS.
   - Use predictable naming from `AZURE_APP_NAME_PREFIX`.
   - Do not overwrite an existing disk.
-- [ ] Bootstrap the VM.
+- [x] Bootstrap the VM.
   - Install Docker Engine and Compose plugin.
   - Add the deploy user to the Docker group.
   - Format and mount the data disk if it is new.
   - Add `/etc/fstab` entry.
   - Create `/srv/hep-data-web` subdirectories.
-- [ ] Print final connection and next-step commands.
+- [x] Print final connection and next-step commands.
   - SSH command.
   - VM public IP/FQDN.
   - Deployment command.
 
 ### 5. Add VM Deployment Script
 
-- [ ] Create `scripts/azure-vm/deploy-compose.ps1`.
+- [x] Create `scripts/azure-vm/deploy-compose.ps1`.
   - Read the same config file as `create-vm.ps1`.
   - Connect to the VM over SSH/SCP.
   - Create the remote deployment directories.
-- [ ] Copy Compose files and reverse proxy config to the VM.
-- [ ] Render or copy the Caddyfile.
+- [x] Copy Compose files and reverse proxy config to the VM.
+- [x] Render or copy the Caddyfile.
   - Use the configured public hostname for Let's Encrypt issuance.
   - Use the configured ACME email when available.
   - Refuse production HTTPS deployment if no public hostname is configured.
-- [ ] Copy or render a production `.env` template only when explicitly requested.
+- [x] Copy or render a production `.env` template only when explicitly requested.
   - Do not overwrite an existing remote `.env` unless `-ForceEnv` or similar is provided.
   - Never print secret values.
 - [ ] Authenticate with the container registry if needed.
   - Support Docker Hub or GHCR token through local environment/config.
   - Prefer `docker login` on the VM only when the image is private.
-- [ ] Pull images.
-- [ ] Run `docker compose up -d`.
-- [ ] Run a post-deploy status check.
+- [x] Pull images.
+- [x] Run `docker compose up -d`.
+- [x] Run a post-deploy status check.
   - `docker compose ps`.
   - `docker compose logs --tail`.
   - HTTP health or homepage check if the host is reachable.
   - HTTPS check for the public hostname after DNS is live.
   - Caddy log check showing successful certificate issuance or reuse.
-- [ ] Print admin bootstrap commands.
+- [x] Print admin bootstrap commands.
   - `docker compose exec web uv run python manage.py createsuperuser`.
   - Link to the approval admin page.
 
@@ -335,11 +335,11 @@ Add VM-specific variables only when needed:
 
 ### 6. Add Backup and Restore Support
 
-- [ ] Create `scripts/azure-vm/backup-now.ps1`.
+- [x] Create `scripts/azure-vm/backup-now.ps1`.
   - Run `pg_dump` from the `postgres` container.
   - Archive media/artifact directories.
   - Store timestamped files under `/srv/hep-data-web/backups`.
-- [ ] Add optional upload to Azure Blob Storage.
+- [x] Add optional upload to Azure Blob Storage.
   - Create or reuse a storage account/container.
   - Use Azure CLI auth or a scoped SAS token.
   - Do not require Blob Storage for the minimal VM deployment.
@@ -347,7 +347,7 @@ Add VM-specific variables only when needed:
   - Daily database backup is enough for the expected usage.
   - Keep local retention small, for example 7 daily backups.
   - Keep remote retention documented.
-- [ ] Document restore.
+- [x] Document restore.
   - Stop web/worker.
   - Restore database dump into Postgres.
   - Restore media/artifact archive.
@@ -356,70 +356,70 @@ Add VM-specific variables only when needed:
 
 ### 7. Add VM Teardown Scripts
 
-- [ ] Create `scripts/azure-vm/delete-vm.ps1`.
+- [x] Create `scripts/azure-vm/delete-vm.ps1`.
   - Delete the VM and ephemeral network resources.
   - Preserve the managed data disk by default.
   - Preserve backup storage by default.
   - Print the preserved resource names.
-- [ ] Create `scripts/azure-vm/delete-persistent-data.ps1`.
+- [x] Create `scripts/azure-vm/delete-persistent-data.ps1`.
   - Require typing `DELETE`.
   - Delete the managed data disk.
   - Optionally delete backup storage only when explicitly requested.
 - [ ] Add dry-run or `-WhatIf` support where practical.
-- [ ] Document the difference between app teardown and persistent data deletion.
+- [x] Document the difference between app teardown and persistent data deletion.
 
 ### 8. Update Runtime Defaults for Single-User Operation
 
-- [ ] Set the recommended VM deployment `JOB_QUEUE_LIMIT` to a small value.
+- [x] Set the recommended VM deployment `JOB_QUEUE_LIMIT` to a small value.
   - Suggested default for VM docs: `JOB_QUEUE_LIMIT=3`.
   - This allows one running job and a tiny queue without pretending to support many users.
-- [ ] Keep exactly one worker process.
+- [x] Keep exactly one worker process.
   - Do not add multiple worker replicas.
   - Do not add distributed scheduler infrastructure.
-- [ ] Confirm worker restart behavior.
+- [x] Confirm worker restart behavior.
   - Restarting the worker should mark stale running jobs failed using existing recovery behavior.
   - Document this as acceptable for the hobby deployment.
-- [ ] Keep polling conservative.
+- [x] Keep polling conservative.
   - Preserve `JOB_POLL_INTERVAL_SECONDS=1` or increase it if desired.
   - Do not introduce high-frequency status infrastructure.
 
 ### 9. Security Hardening for a Small VM
 
-- [ ] Restrict SSH in the NSG.
+- [x] Restrict SSH in the NSG.
   - Prefer the operator's current public IP `/32`.
   - Document how to update the rule when the operator IP changes.
-- [ ] Require SSH key authentication.
-- [ ] Do not expose Docker API outside the Compose network.
-- [ ] Do not expose Postgres outside the Compose network.
-- [ ] Keep the reverse proxy as the only public web entry point.
+- [x] Require SSH key authentication.
+- [x] Do not expose Docker API outside the Compose network.
+- [x] Do not expose Postgres outside the Compose network.
+- [x] Keep the reverse proxy as the only public web entry point.
   - Public ports should be 80 and 443 only.
   - The Django `web` container port should not be exposed directly to the internet.
-- [ ] Store production `.env` outside git.
+- [x] Store production `.env` outside git.
   - Suggested path: `/srv/hep-data-web/env/.env`.
   - File mode should be readable only by the deploy user/root where practical.
 - [ ] Document OS patching.
   - Enable unattended security upgrades or document a monthly patch command.
-- [ ] Add a simple firewall note.
+- [x] Add a simple firewall note.
   - NSG is required.
   - `ufw` is optional if NSG rules are clear and minimal.
 
 ### 10. Verification and Acceptance
 
-- [ ] Verify the VM can be created from scratch with `scripts/azure-vm/create-vm.ps1`.
-- [ ] Verify Docker and Compose are installed on the VM.
-- [ ] Verify the data disk is mounted at `/srv/hep-data-web`.
-- [ ] Verify Compose starts all services.
-- [ ] Verify migrations run automatically before web/worker.
-- [ ] Verify the homepage loads through the public HTTPS URL.
-- [ ] Verify the HTTPS certificate is issued by Let's Encrypt in the default path.
-- [ ] Verify Caddy certificate state persists under `/srv/hep-data-web/data/caddy`.
-- [ ] Verify a Compose restart does not request a fresh certificate unnecessarily.
-- [ ] Verify the plan documents manual cert/key installation for non-Let's Encrypt deployments.
-- [ ] Verify admin bootstrap works.
-- [ ] Verify a user can submit one job and the worker processes it.
-- [ ] Verify backend execution can access a Docker daemon on the VM.
-- [ ] Verify generated artifacts persist after `docker compose down` and `docker compose up -d`.
-- [ ] Verify database state persists after VM reboot.
+- [x] Verify the VM can be created from scratch with `scripts/azure-vm/create-vm.ps1`.
+- [x] Verify Docker and Compose are installed on the VM.
+- [x] Verify the data disk is mounted at `/srv/hep-data-web`.
+- [x] Verify Compose starts all services.
+- [x] Verify migrations run automatically before web/worker.
+- [x] Verify the homepage loads through the public HTTPS URL.
+- [x] Verify the HTTPS certificate is issued by Let's Encrypt in the default path.
+- [x] Verify Caddy certificate state persists under `/srv/hep-data-web/data/caddy`.
+- [x] Verify a Compose restart does not request a fresh certificate unnecessarily.
+- [x] Verify the plan documents manual cert/key installation for non-Let's Encrypt deployments.
+- [x] Verify admin bootstrap works.
+- [x] Verify a user can submit one job and the worker processes it.
+- [x] Verify backend execution can access a Docker daemon on the VM.
+- [x] Verify generated artifacts persist after `docker compose down` and `docker compose up -d`.
+- [x] Verify database state persists after VM reboot.
 - [ ] Verify backup script creates a database dump and artifact archive.
 - [ ] Verify app-resource teardown preserves the data disk.
 - [ ] Verify a new VM can be attached to the preserved data disk and recover the app state.
