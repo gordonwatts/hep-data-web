@@ -309,13 +309,21 @@ class ArtifactConventionTests(TestCase):
                             str(home_dir),
                         ):
                             with patch("portal.services.subprocess.run", return_value=completed):
-                                services.run_backend_job(job)
+                                result = services.run_backend_job(job)
 
             home_servicex = yaml.safe_load((home_dir / "servicex.yaml").read_text(encoding="utf-8"))
             assert home_servicex["dataset"] == "test"
             assert home_servicex["cache_path"] == "/cache"
             assert home_servicex["nested"]["value"] == 1
             assert not (base_dir / "servicex.yaml").exists()
+            runtime_context = result.metadata["runtime_context"]
+            assert runtime_context["cwd"] == str(base_dir)
+            assert runtime_context["home"] == str(home_dir)
+            assert runtime_context["servicex_candidates"][str(home_dir / "servicex.yaml")]["exists"]
+            assert (
+                runtime_context["servicex_candidates"][str(base_dir / "servicex.yaml")]["exists"]
+                is False
+            )
 
     def test_run_backend_job_writes_servicex_config_to_base_dir_when_home_is_unset(self):
         user = get_user_model().objects.create_user(username="servicex-base-user")

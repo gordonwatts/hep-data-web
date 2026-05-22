@@ -322,6 +322,17 @@ Add VM-specific variables only when needed:
   - `docker compose exec web uv run python manage.py createsuperuser`.
   - Link to the approval admin page.
 
+### 5a. Backend Job Visibility and ServiceX Config Handling
+
+- [x] Copy the configured ServiceX YAML into the VM-visible home directory before launching `hep-data-llm plot`.
+  - Keep the host-side `SERVICEX_CONFIG_PATH` as the deploy-machine path.
+  - Make the container-side path resolve to `/host-home/servicex.yaml`.
+  - Preserve the existing `hep-data-llm` lookup behavior without changing that repo.
+- [x] Emit worker-side runtime context for backend jobs.
+  - Log the resolved working directory, `HOME`, and `USERPROFILE`.
+  - Log the candidate `servicex.yaml` locations and whether they exist.
+  - Make the runtime context visible in VM worker logs for troubleshooting.
+
 ### 6. Add Backup and Restore Support
 
 - [ ] Create `scripts/azure-vm/backup-now.ps1`.

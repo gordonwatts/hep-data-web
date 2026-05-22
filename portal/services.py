@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 import subprocess
@@ -24,6 +25,8 @@ from portal.backend import (
     validate_backend_profile,
 )
 from portal.models import Job, JobStatus
+
+logger = logging.getLogger(__name__)
 
 
 class QueueFullError(RuntimeError):
@@ -196,6 +199,26 @@ def run_backend_job(job: Job) -> JobExecutionResult:
     _write_backend_env_file(Path(settings.BASE_DIR))
     env["XDG_CACHE_HOME"] = str(_backend_cache_root())
 
+    servicex_candidates = []
+    if home_dir:
+        servicex_candidates.append(Path(home_dir) / "servicex.yaml")
+    servicex_candidates.append(Path(settings.BASE_DIR) / "servicex.yaml")
+    servicex_status = {
+        str(path): {
+            "exists": path.exists(),
+            "size": path.stat().st_size if path.exists() else None,
+        }
+        for path in servicex_candidates
+    }
+    logger.info(
+        "Starting backend job %s with cwd=%s home=%s output=%s servicex=%s",
+        job.pk,
+        settings.BASE_DIR,
+        home_dir or "",
+        output_path,
+        servicex_status,
+    )
+
     proc = subprocess.run(
         _backend_command_for_job(job, output_path),
         cwd=str(settings.BASE_DIR),
@@ -215,6 +238,12 @@ def run_backend_job(job: Job) -> JobExecutionResult:
         "output_path": str(output_path),
         "image_paths": [str(path) for path in image_paths],
         "returncode": proc.returncode,
+        "runtime_context": {
+            "cwd": str(settings.BASE_DIR),
+            "home": home_dir,
+            "servicex_config_path": str(os.environ.get("SERVICEX_CONFIG_PATH", "")).strip(),
+            "servicex_candidates": servicex_status,
+        },
     }
     return JobExecutionResult(
         output_path=output_path,
