@@ -187,7 +187,6 @@ if (-not [string]::IsNullOrWhiteSpace($AllowedSshCidr)) {
   }
 }
 
-$fstabLine = "UUID=`$disk_uuid $VmDataMount ext4 defaults,nofail 0 2"
 $bootstrapScript = @(
   'set -eux',
   'export DEBIAN_FRONTEND=noninteractive',
@@ -197,12 +196,22 @@ $bootstrapScript = @(
   'systemctl enable --now docker',
   "usermod -aG docker $AdminUser || true",
   "install -d -m 755 $VmDataMount",
-  'if [ -b /dev/disk/azure/scsi1/lun0 ]; then',
-  '  if ! blkid /dev/disk/azure/scsi1/lun0 >/dev/null 2>&1; then mkfs.ext4 -F /dev/disk/azure/scsi1/lun0; fi',
-  '  disk_uuid=$(blkid -s UUID -o value /dev/disk/azure/scsi1/lun0)',
-  "  grep -q `"$fstabLine`" /etc/fstab || echo `"$fstabLine`" >> /etc/fstab",
-  '  mount -a',
+  'data_device=/dev/disk/azure/scsi1/lun0',
+  'if [ ! -b "$data_device" ]; then echo "Managed data disk not found at $data_device" >&2; exit 1; fi',
+  'if ! blkid "$data_device" >/dev/null 2>&1; then mkfs.ext4 -F "$data_device"; fi',
+  'disk_uuid=$(blkid -s UUID -o value "$data_device")',
+  "fstab_entry=`"UUID=`$disk_uuid $VmDataMount ext4 defaults,nofail 0 2`"",
+  "grep -v `"[[:space:]]$VmDataMount[[:space:]]`" /etc/fstab > /tmp/hep-data-web-fstab",
+  'printf "%s\n" "$fstab_entry" >> /tmp/hep-data-web-fstab',
+  'cat /tmp/hep-data-web-fstab > /etc/fstab',
+  "if ! mountpoint -q $VmDataMount; then",
+  "  if [ -n `"`$(find $VmDataMount -mindepth 1 -maxdepth 1 -print -quit)`" ]; then",
+  "    echo `"$VmDataMount contains files but is not mounted; refusing to hide OS-disk data. Move or back it up, then rerun.`" >&2",
+  '    exit 1',
+  '  fi',
+  "  mount $VmDataMount",
   'fi',
+  "if ! mountpoint -q $VmDataMount; then echo `"$VmDataMount is not mounted`" >&2; exit 1; fi",
   "mkdir -p $VmDataMount/compose $VmDataMount/env $VmDataMount/env/certs $VmDataMount/data/docker $VmDataMount/data/postgres $VmDataMount/data/media $VmDataMount/data/staticfiles $VmDataMount/data/tmp $VmDataMount/data/home $VmDataMount/data/caddy $VmDataMount/data/caddy-config $VmDataMount/backups $VmDataMount/logs",
   "chown -R ${AdminUser}:${AdminUser} $VmDataMount"
 )

@@ -186,6 +186,23 @@ $remoteCerts = "$remoteBase/env/certs"
 $remoteHome = "$remoteBase/data/home"
 
 Invoke-Ssh -Hostname $VmHost -User $AdminUser -PrivateKeyPath $SshPrivateKeyPath -Command @(
+  "mountpoint",
+  "-q",
+  $remoteBase,
+  "||",
+  "(",
+  "echo",
+  "'$remoteBase is not mounted; run create-vm.ps1 and verify the managed data disk before deploying.'",
+  ">&2;",
+  "exit",
+  "1",
+  ")"
+)
+if ($LASTEXITCODE -ne 0) {
+  throw "Persistent data mount '$remoteBase' is not active on '$VmHost'."
+}
+
+Invoke-Ssh -Hostname $VmHost -User $AdminUser -PrivateKeyPath $SshPrivateKeyPath -Command @(
   "sudo", "install", "-d",
   "-o", $AdminUser,
   "-g", $AdminUser,

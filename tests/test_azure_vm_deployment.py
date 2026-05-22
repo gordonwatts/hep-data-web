@@ -58,6 +58,25 @@ def test_azure_vm_deploy_script_maps_openai_key_to_backend_variable():
     assert "OPENAI_API_KEY = $OpenAiApiKey" in deploy_script
 
 
+def test_azure_vm_create_script_persists_and_validates_data_disk_mount():
+    create_script = Path("scripts/azure-vm/create-vm.ps1").read_text(encoding="utf-8")
+
+    assert "fstab_entry=" in create_script
+    assert "grep -v" in create_script
+    assert "mountpoint -q $VmDataMount" in create_script
+    assert "refusing to hide OS-disk data" in create_script
+    assert "Managed data disk not found" in create_script
+
+
+def test_azure_vm_deploy_script_refuses_unmounted_data_disk():
+    deploy_script = Path("scripts/azure-vm/deploy-compose.ps1").read_text(encoding="utf-8")
+
+    assert "mountpoint" in deploy_script
+    assert "-q" in deploy_script
+    assert "is not mounted; run create-vm.ps1" in deploy_script
+    assert "Persistent data mount" in deploy_script
+
+
 def test_azure_vm_deploy_script_copies_servicex_config_to_home_and_data_mount():
     deploy_script = Path("scripts/azure-vm/deploy-compose.ps1").read_text(encoding="utf-8")
 

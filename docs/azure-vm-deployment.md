@@ -45,6 +45,23 @@ Azure gives the VM one operating-system disk and one separate managed data disk.
 - The `delete-vm.ps1` script now deletes the current VM OS disk when you tear
   the VM down, but older orphaned OS disks from earlier recreates may still
   need a one-time manual cleanup.
+- The deployment script refuses to deploy unless `/srv/hep-data-web` is an
+  active mount. This is intentional: if that path is on `/dev/root`, Postgres
+  would write user accounts to the disposable OS disk and they would disappear
+  after the next VM recreation.
+
+Verify the persistent disk before deploying:
+
+```powershell
+az vm run-command invoke `
+  --resource-group hep-data-web-vm `
+  --name hep-data-web-vm `
+  --command-id RunShellScript `
+  --scripts "mountpoint -q /srv/hep-data-web && findmnt -no SOURCE,TARGET,FSTYPE,UUID /srv/hep-data-web && df -h /srv/hep-data-web"
+```
+
+Expected result: `findmnt` prints `/srv/hep-data-web` on the managed data disk,
+not `/dev/root`.
 
 ## First-time setup
 
