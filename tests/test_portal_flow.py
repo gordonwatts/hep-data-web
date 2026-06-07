@@ -234,3 +234,35 @@ class PortalFlowTests(TestCase):
             reverse("job-detail", kwargs={"submission_id": cloned.submission_id}),
             fetch_redirect_response=False,
         )
+
+    def test_admin_jobs_page_lists_questions_and_statuses(self):
+        completed_job = Job.objects.create(
+            owner=self.owner,
+            original_prompt="Plot the leading jet pT",
+            resolved_dataset="dataset",
+            backend_profile="rdf",
+            status=JobStatus.COMPLETED,
+        )
+        Job.objects.create(
+            owner=self.other,
+            original_prompt="Show the missing energy distribution",
+            resolved_dataset="dataset",
+            backend_profile="rdf",
+            status=JobStatus.QUEUED,
+        )
+        self.other.is_staff = True
+        self.other.save(update_fields=["is_staff"])
+        self.client.force_login(self.other)
+
+        response = self.client.get(reverse("admin-jobs"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.owner.get_username())
+        self.assertContains(response, "Plot the leading jet pT")
+        self.assertContains(
+            response,
+            reverse("job-detail", kwargs={"submission_id": completed_job.submission_id}),
+        )
+        self.assertContains(response, "Successful")
+        self.assertContains(response, "Queued")
+        self.assertContains(response, "Show the missing energy distribution")

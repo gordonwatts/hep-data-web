@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Question history{% endblock %}
+
+{% block content %}
+  <div class="card shadow-sm">
+    <div class="card-body p-4 p-md-5">
+      <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-4">
+        <div>
+          <p class="text-uppercase text-accent fw-semibold small mb-2">Administration</p>
+          <h1 class="h4 mb-1">Question history</h1>
+          <p class="text-muted mb-0">Review every submitted question and jump to the saved result page.</p>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Question</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in job_rows %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ row.owner_name }}</div>
+                  <div class="text-muted small">{{ row.job.owner.email|default:"No email" }}</div>
+                </td>
+                <td class="small">
+                  <a href="{{ row.question_url }}" title="{{ row.job.original_prompt|escape }}">
+                    {{ row.job.original_prompt }}
+                  </a>
+                </td>
+                <td>
+                  <span class="badge {{ row.badge_class }}">{{ row.status_label }}</span>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="3" class="text-muted">No questions have been submitted yet.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endblock %}

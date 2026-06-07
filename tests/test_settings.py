@@ -74,4 +74,7 @@ def test_base_settings_default_job_poll_interval_is_one():
 
 
 def test_staticfiles_storage_uses_whitenoise_manifest_backend():
-    assert base.STORAGES["staticfiles"]["BACKEND"] == "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    assert (
+        base.STORAGES["staticfiles"]["BACKEND"]
+        == "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    )

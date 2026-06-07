@@ -1,5 +1,5 @@
-from unittest.mock import patch
 import urllib.error
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase, override_settings
@@ -22,6 +22,7 @@ class AuthFlowTests(TestCase):
             password="secret",
             is_staff=True,
         )
+        get_or_create_profile_for_user(self.admin_user)
 
     def _force_pending_login(self, user):
         profile = get_or_create_profile_for_user(user)
@@ -207,7 +208,10 @@ class AuthFlowTests(TestCase):
                     "html_url": "https://github.com/octocat",
                 },
             ),
-            patch("portal.views.get_or_create_profile_from_github", side_effect=RuntimeError("boom")),
+            patch(
+                "portal.views.get_or_create_profile_from_github",
+                side_effect=RuntimeError("boom"),
+            ),
         ):
             with self.assertLogs("portal.views", level="ERROR") as logs:
                 response = self.client.get(
@@ -220,7 +224,12 @@ class AuthFlowTests(TestCase):
             reverse("login"),
             fetch_redirect_response=False,
         )
-        self.assertTrue(any("GitHub callback failed after successful authorization" in line for line in logs.output))
+        self.assertTrue(
+            any(
+                "GitHub callback failed after successful authorization" in line
+                for line in logs.output
+            )
+        )
 
     @override_settings(
         GITHUB_CLIENT_ID="client",
@@ -276,6 +285,37 @@ class AuthFlowTests(TestCase):
         allowed_response = self.client.get(reverse("home"))
         self.assertEqual(allowed_response.status_code, 200)
         self.assertContains(allowed_response, "Ask for a plot in plain language")
+
+    def test_staff_user_sees_admin_nav_links(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertContains(response, "Admin jobs")
+        self.assertContains(response, "Admin users")
+
+    def test_admin_jobs_page_rejects_non_admin_users(self):
+        user = get_user_model().objects.create_user(username="regular", password="secret")
+        profile = get_or_create_profile_for_user(user)
+        profile.approval_state = ApprovalState.APPROVED
+        profile.save(update_fields=["approval_state"])
+        self.client.force_login(user)
+        session = self.client.session
+        session[SESSION_APPROVED_LOGIN_KEY] = True
+        session.save()
+
+        response = self.client.get(reverse("admin-jobs"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_jobs_page_redirects_anonymous_users(self):
+        response = self.client.get(reverse("admin-jobs"))
+
+        self.assertRedirects(
+            response,
+            f"{reverse('login')}?next={reverse('admin-jobs')}",
+            fetch_redirect_response=False,
+        )
 
     def test_rejected_user_refresh_stays_blocked(self):
         target_user = get_user_model().objects.create_user(

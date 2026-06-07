@@ -357,7 +357,7 @@ wheels = [
 
 [[package]]
 name = "hep-data-llm"
-version = "1.1.1"
+version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "diskcache" },
@@ -370,9 +370,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/21/79/30f7b3ec68016d2b13466eddda027619700606baeef567f96c94fc68743e/hep_data_llm-1.1.1.tar.gz", hash = "sha256:fa42f897858f02fa17a767894cb801b4405ee6aa41140c965d5bc88c6a7b295b", size = 26245378, upload-time = "2025-11-27T16:12:37.776Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/da/d7/423396472dd968f49abf548e321a1dc2a72c988a60f3fbd5e1b0a6b1104a/hep_data_llm-2.0.0.tar.gz", hash = "sha256:ef2957618678dd7c0384aa183692b23a672841ac8383170bf0be0acf9bf128e0", size = 37165645, upload-time = "2026-05-20T07:59:07.146Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b1/0c/39854f101db8bbfd5d197ba40e56801e59d50ba6f47b51b92b127e0b7969/hep_data_llm-1.1.1-py3-none-any.whl", hash = "sha256:6920e15051ef5a064339195ce71de9f7b3070d620f0895e5435b6a96ae00dca8", size = 32422, upload-time = "2025-11-27T16:12:34.467Z" },
+    { url = "https://files.pythonhosted.org/packages/93/42/00b3799546f2626b7597bf1f46de98c569edb119634e3ab7c060fe3e2262/hep_data_llm-2.0.0-py3-none-any.whl", hash = "sha256:36d65cd7de2af08dc88f07417fcd57acdf9fc3f9b5c01c1801efae0f0162a2c9", size = 45212, upload-time = "2026-05-20T07:59:05.399Z" },
 ]
 
 [[package]]
@@ -399,7 +399,7 @@ dev = [
 requires-dist = [
     { name = "django", specifier = ">=5.1,<5.2" },
     { name = "gunicorn", specifier = ">=23.0,<24.0" },
-    { name = "hep-data-llm", specifier = "==1.1.1" },
+    { name = "hep-data-llm", specifier = "==2.0.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3,<9.0" },
     { name = "pytest-django", marker = "extra == 'dev'", specifier = ">=4.9,<5.0" },

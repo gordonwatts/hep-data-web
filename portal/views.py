@@ -54,6 +54,12 @@ JOB_BADGE_CLASSES = {
     JobStatus.CANCELLED: "text-bg-warning",
 }
 
+JOB_ADMIN_STATUS_LABELS = {
+    JobStatus.COMPLETED: "Successful",
+    JobStatus.FAILED: "Not successful",
+    JobStatus.CANCELLED: "Not successful",
+}
+
 
 def featured_example_questions():
     example_questions = load_example_questions()
@@ -64,6 +70,10 @@ def featured_example_questions():
 
 def _job_badge_class(status: str) -> str:
     return JOB_BADGE_CLASSES.get(status, "text-bg-secondary")
+
+
+def _job_admin_status_label(status: str) -> str:
+    return JOB_ADMIN_STATUS_LABELS.get(status, status.title())
 
 
 def _job_accessible_to_user(request, job: Job) -> bool:
@@ -277,6 +287,30 @@ def admin_users(request):
         {
             "page_title": "User approvals",
             "profiles": profiles,
+        },
+    )
+
+
+@login_required
+def admin_jobs(request):
+    _admin_profile_or_403(request)
+    jobs = Job.objects.select_related("owner").order_by("-submitted_at", "-pk")
+    rows = [
+        {
+            "job": job,
+            "owner_name": job.owner.get_full_name() or job.owner.get_username(),
+            "question_url": reverse("job-detail", kwargs={"submission_id": job.submission_id}),
+            "status_label": _job_admin_status_label(job.status),
+            "badge_class": _job_badge_class(job.status),
+        }
+        for job in jobs
+    ]
+    return render(
+        request,
+        "portal/admin_jobs.html",
+        {
+            "page_title": "Question history",
+            "job_rows": rows,
         },
     )
 

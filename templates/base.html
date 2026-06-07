@@ -63,6 +63,10 @@
             <span class="nav-link disabled text-white-50">
               Signed in as {{ user.get_full_name|default:user.profile.github_login|default:user.get_username }}
             </span>
+            {% if user.is_staff or user.profile.role == 'admin' %}
+              <a class="nav-link" href="{% url 'admin-jobs' %}">Admin jobs</a>
+              <a class="nav-link" href="{% url 'admin-users' %}">Admin users</a>
+            {% endif %}
             <a class="nav-link" href="{% url 'auth-status' %}">Account status</a>
             <a class="nav-link" href="{% url 'logout' %}">Log out</a>
           {% else %}

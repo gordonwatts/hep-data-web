@@ -9,6 +9,7 @@ urlpatterns = [
     path("accounts/status/", views.auth_status, name="auth-status"),
     path("accounts/logout/", views.logout, name="logout"),
     path("admin/users/", views.admin_users, name="admin-users"),
+    path("admin/jobs/", views.admin_jobs, name="admin-jobs"),
     path(
         "admin/users/<int:profile_id>/<str:decision>/",
         views.admin_user_decision,
